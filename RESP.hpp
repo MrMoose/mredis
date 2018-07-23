@@ -1,0 +1,42 @@
+
+//  Copyright 2018 Stephan Menzel. Distributed under the Boost
+//  Software License, Version 1.0. (See accompanying file
+//  LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+
+#pragma once
+#include "MRedisConfig.hpp"
+#include "MRedisResult.hpp"
+
+#include <boost/variant.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/asio/streambuf.hpp>
+
+#include <iostream>
+#include <string>
+
+namespace moose {
+namespace mredis {
+
+RESPonse parse(const std::string n_input);
+
+/*! @defgroup generators to write commands onto the stream
+	Everything that takes stream ptrs asserts when they are null
+	@{
+*/
+
+//! write a ping into the stream
+MREDIS_API void ping(std::ostream &n_os);
+
+
+/*! @} */
+
+
+MREDIS_API RESPonse parse_one(std::istream &n_is);
+
+
+
+
+
+}
+}
+
