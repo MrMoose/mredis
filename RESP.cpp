@@ -21,17 +21,6 @@ namespace qi = boost::spirit::qi;
 namespace ascii = qi::ascii;
 namespace karma = boost::spirit::karma;
 
-template <typename OutputIterator>
-struct simple_string_generator : karma::grammar<OutputIterator, std::string()> {
-
-	simple_string_generator() : simple_string_generator::base_type(m_start, "simple_string") {
-
-		m_start %= karma::string << "\r\n";
-	}
-
-	karma::rule<OutputIterator, std::string()>  m_start;
-};
-
 template <typename InputIterator>
 struct simple_string_parser : qi::grammar<InputIterator, std::string()> {
 
@@ -73,10 +62,14 @@ RESPonse parse(const std::string n_input) {
 	return 0;
 }
 
-void ping(std::ostream &n_os) {
+void format_ping(std::ostream &n_os) {
 
-	simple_string_generator< boost::spirit::karma::ostream_iterator<char> > ssg;
-	n_os << karma::format(ssg, "PING");
+	n_os << karma::format("PING\r\n");
+}
+
+void format_hincrby(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name) {
+
+	n_os << karma::format("HINCRBY " << karma::string << " " << karma::string << "\r\n", n_hash_name, n_field_name);
 }
 
 RESPonse parse_one(std::istream &n_is) {

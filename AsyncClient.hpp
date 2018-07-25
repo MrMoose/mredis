@@ -20,6 +20,10 @@ class MRedisTCPConnection;
 	And yes, I know. Classes that are described as "simple" generally turn out 
 	not at all simple or broken or both. But I have no choice. None of the available 
 	redis client libs are suitable for this.
+
+	@note This is meant to use an io_context that is already run elsewhere.
+		It relies on the fact that this actually is run. Also, it does not support 
+		multiple threads running that io_context. Implicit strand.
  */
 class AsyncClient {
 
@@ -28,23 +32,41 @@ class AsyncClient {
 		typedef std::function<void (const RESPonse &n_result)> Callback;
 
 		//! use local unix domain socket
-		AsyncClient(boost::asio::io_context &n_io_context);
+		MREDIS_API AsyncClient(boost::asio::io_context &n_io_context);
 
-		/*! use IP
+		/*! use IP to do TCP connect
 			@note asserts on empty server
 		 */
-		AsyncClient(boost::asio::io_context &n_io_context, const std::string &n_server, const boost::uint16_t n_port = 6379);
+		MREDIS_API AsyncClient(boost::asio::io_context &n_io_context, const std::string &n_server, const boost::uint16_t n_port = 6379);
 
-		virtual ~AsyncClient() noexcept;
+		MREDIS_API virtual ~AsyncClient() noexcept;
 
 		/*! connect right away
 			@note if already connected, will re-connect
 			@throw network_error on cannot resolve host name
 		 */
-		void connect();
+		MREDIS_API void connect();
 
 		void set(const std::string &n_name, const std::string   &n_value);
 		void set(const std::string &n_name, const boost::int64_t n_value);
+
+
+		/*! @defgroup hash map functions
+			They all assert when connect wasn't called.
+			@{
+		*/
+
+		/*! @brief hash map field increment
+			@param n_hash_name assert on empty
+			@param n_field_name assumed to be an integer field
+			@param n_callback if set, must be no-throw
+			@see https://redis.io/commands/hincrby
+		 */
+		MREDIS_API void hincrby(const std::string &n_hash_name,
+		                        const std::string &n_field_name,
+		                        Callback &&n_callback = Callback()) noexcept;
+
+		/*! @} */
 
 	private:
 

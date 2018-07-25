@@ -46,5 +46,16 @@ void AsyncClient::connect() {
 	m_connection->connect(m_server);
 }
 
+void AsyncClient::hincrby(const std::string &n_hash_name, const std::string &n_field_name, Callback &&n_callback /*= Callback()*/) noexcept {
+
+	MOOSE_ASSERT(m_connection);
+
+
+	m_connection->send_command(
+			[&](std::ostream &n_os) { format_hincrby(n_os, n_hash_name, n_field_name); }
+	, std::move(n_callback));
+
+}
+
 }
 }
