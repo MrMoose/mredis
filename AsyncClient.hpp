@@ -29,8 +29,6 @@ class AsyncClient {
 
 	public:
 		
-		typedef std::function<void (const RESPonse &n_result)> Callback;
-
 		//! use local unix domain socket
 		MREDIS_API AsyncClient(boost::asio::io_context &n_io_context);
 
@@ -64,6 +62,7 @@ class AsyncClient {
 		 */
 		MREDIS_API void hincrby(const std::string &n_hash_name,
 		                        const std::string &n_field_name,
+								const boost::int64_t n_increment_by = 1,
 		                        Callback &&n_callback = Callback()) noexcept;
 
 		/*! @} */

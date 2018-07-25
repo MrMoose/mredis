@@ -29,7 +29,7 @@ MREDIS_API void format_ping(std::ostream &n_os);
 
 
 //! @return integer
-MREDIS_API void format_hincrby(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name);
+MREDIS_API void format_hincrby(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name, const boost::int64_t n_incr_by);
 
 /*! @} */
 

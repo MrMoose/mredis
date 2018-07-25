@@ -24,15 +24,17 @@ namespace ip = asio::ip;
 MRedisTCPConnection::MRedisTCPConnection(AsyncClient &n_parent)
 		: m_parent(n_parent)
 		, m_socket(n_parent.m_io_context)
-		, m_retry_timer(n_parent.m_io_context)
-		, m_sending(false)
+		, m_send_retry_timer(n_parent.m_io_context)
+		, m_receive_retry_timer(n_parent.m_io_context)
+		, m_buffer_busy(false)
 		, m_status(Status::Disconnected) {
 
 }
 
 MRedisTCPConnection::~MRedisTCPConnection() noexcept {
 	
-	m_retry_timer.cancel();
+	m_send_retry_timer.cancel();
+	m_receive_retry_timer.cancel();
 }
 
 void MRedisTCPConnection::connect(const std::string &n_server, const boost::uint16_t n_port) {
@@ -67,6 +69,10 @@ void MRedisTCPConnection::stop() noexcept {
 
 	BOOST_LOG_FUNCTION();
 	BOOST_LOG_SEV(logger(), normal) << "MRedis TCP connection shutting down";
+
+	m_send_retry_timer.cancel();
+	m_receive_retry_timer.cancel();
+
 	m_status = Status::Shutdown;
 
 	boost::system::error_code ec;
@@ -143,42 +149,66 @@ void MRedisTCPConnection::send_command(std::function<void(std::ostream &n_os)> &
 	MOOSE_ASSERT_MSG(n_prepare, "stream preparation function must be given");
 
 	if (m_status != Status::Pushing) {
-		BOOST_LOG_SEV(logger(), warning) << "Cannot push command into this connection. It is in state " << m_status;
+		BOOST_LOG_SEV(logger(), warning) << "Cannot push command into this connection. It is not in state pushing";
+		return;
 	}
 
 	try {
 		// if the streambuf is in use we cannot push data into it
-		// we have to wait for it to become available
-		if (m_sending) {
-			m_retry_timer.expires_after(asio::chrono::milliseconds(1));
-			m_retry_timer.async_wait(
-				[=, this](const boost::system::error_code &n_err) {
-		
-					if (!n_err && this->m_status == Status::Pushing) {
-						asio::post(m_parent.m_io_context, [=, this]() { this->send_command(n_prepare, n_callback); });
-					}
-				});
-				return;
+		// we have to wait for it to become available. We store both handlers until later
+		if (m_buffer_busy) {
+			mrequest req;
+			req.m_prepare = std::move(n_prepare);
+			req.m_callback = std::move(n_callback);
+			m_requests_not_sent.emplace_back(std::move(req));
+
+			// I will only post a wait handler if the queue of outstanding 
+			// requests is empty to avoid having multiple in flight
+			if (m_requests_not_sent.size() > 0) {
+				m_send_retry_timer.expires_after(asio::chrono::milliseconds(1));
+				m_send_retry_timer.async_wait(
+					[this](const boost::system::error_code &n_err) {
+
+						if (!n_err && this->m_status == Status::Pushing) {
+							this->send_outstanding_requests();
+						}
+					});
+			}
+			return;
 		}
 
 		// we have waited for our buffer to become available. Right now I assume there is 
 		// no async operation in progress on it
-		MOOSE_ASSERT((!m_sending));
-		m_sending = true;
+		MOOSE_ASSERT((!m_buffer_busy));
+		m_buffer_busy = true;
 
 		{
-			// The caller told us what he wants to put into the command
 			std::ostream os(&m_streambuf);
+
+			// See if we have unsent requests and stream them first in the order they came in
+			for (mrequest &req : m_requests_not_sent) {
+				req.m_prepare(os);
+				m_outstanding.emplace_back(req.m_callback);
+			}
+
+			m_requests_not_sent.clear();
+
+			// The caller told us what he wants to put into the command
 			n_prepare(os);
+			m_outstanding.emplace_back(n_callback);
 		}
 
-		// and send the content of the buffer
+		// send the content of the streambuf to redis
 		asio::async_write(m_socket, m_streambuf,
-			[this](const boost::system::error_code n_errc, const std::size_t n_bytes_sent) {
+			[this, n_callback](const boost::system::error_code n_errc, const std::size_t n_bytes_sent) {
 
-				if (handle_error(n_errc, "sending command to server")) { stop(); return; }
+				m_buffer_busy = false;
+				if (handle_error(n_errc, "sending command(s) to server")) {
+					stop();
+					return;
+				}
 
-				read_response(n_callback);
+				read_response();
 		});
 
 	} catch (const boost::system::system_error &serr) {
@@ -192,6 +222,130 @@ void MRedisTCPConnection::send_command(std::function<void(std::ostream &n_os)> &
 		BOOST_LOG_SEV(logger(), error) << "Unexpected exception in send_command(): " << boost::diagnostic_information(sex);
 	}
 }
+
+
+void MRedisTCPConnection::send_outstanding_requests() noexcept {
+
+	try {
+		// if the streambuf is still in use we have to wait
+		// we have to wait for it to become available. We store both handlers until later
+		if (m_buffer_busy) {		
+			m_send_retry_timer.expires_after(asio::chrono::milliseconds(1));
+			m_send_retry_timer.async_wait(
+				[this](const boost::system::error_code &n_err) {
+
+					if (!n_err && this->m_status == Status::Pushing) {
+						this->send_outstanding_requests();
+					}
+				});
+			return;
+		}
+
+		// we have waited for our buffer to become available. Right now I assume there is 
+		// no async operation in progress on it
+		MOOSE_ASSERT((!m_buffer_busy));
+		m_buffer_busy = true;
+
+		{
+			std::ostream os(&m_streambuf);
+
+			// See if we have unsent requests and stream them first in the order they came in
+			for (mrequest &req : m_requests_not_sent) {
+				req.m_prepare(os);
+				m_outstanding.emplace_back(req.m_callback);
+			}
+
+			m_requests_not_sent.clear();
+		}
+
+		// send the content of the streambuf to redis
+		asio::async_write(m_socket, m_streambuf,
+			[this](const boost::system::error_code n_errc, const std::size_t n_bytes_sent) {
+
+				m_buffer_busy = false;
+				if (handle_error(n_errc, "sending command(s) to server")) {
+					stop();
+					return;
+				}
+
+				read_response();
+			});
+
+	} catch (const boost::system::system_error &serr) {
+		// Very likely we failed to set a retry timer. Doesn't matter. We still wake up as the next command comes in
+		BOOST_LOG_SEV(logger(), warning) << "Error sending command: " << boost::diagnostic_information(serr);
+	} catch (const tools::moose_error &merr) {
+		// Not expected at all
+		BOOST_LOG_SEV(logger(), warning) << "Error sending command: " << boost::diagnostic_information(merr);
+	} catch (const std::exception &sex) {
+		// The caller didn't provide callbacks that were nothrow
+		BOOST_LOG_SEV(logger(), error) << "Unexpected exception in send_command(): " << boost::diagnostic_information(sex);
+	}
+}
+
+void MRedisTCPConnection::read_response() noexcept {
+
+	try {
+		// if the streambuf is in use we cannot push data into it
+		// we have to wait for it to become available. We store both handlers until later
+		if (m_buffer_busy) {
+			
+			// I will only post a wait handler if the queue of outstanding 
+			// responses is not empty to avoid having multiple in flight
+			if (m_outstanding.size() > 0) {
+				m_send_retry_timer.expires_after(asio::chrono::milliseconds(1));
+				m_send_retry_timer.async_wait(
+					[this](const boost::system::error_code &n_err) {
+
+						if (!n_err && this->m_status == Status::Pushing) {
+							this->read_response();
+						}
+				});
+			}
+			return;
+		}
+		
+		if (m_outstanding.empty()) {
+			return;
+		}
+
+		// we have waited for our buffer to become available. Right now I assume there is 
+		// no async operation in progress on it
+		MOOSE_ASSERT((!m_buffer_busy));
+		m_buffer_busy = true;
+
+		// read one response and evaluate
+		asio::async_read_until(m_socket, m_streambuf, "\r\n",
+			[this](const boost::system::error_code n_errc, const std::size_t) {
+
+				if (handle_error(n_errc, "reading response")) {
+					m_buffer_busy = false;
+					stop();
+					return;
+				}
+
+				{
+					std::istream is(&m_streambuf);
+					RESPonse r = parse_one(is);
+					m_outstanding.front()(r);
+					m_outstanding.pop_front();
+				}
+
+				m_buffer_busy = false;
+				read_response();
+			});
+	} catch (const boost::system::system_error &serr) {
+		// Very likely we failed to set a retry timer. Doesn't matter. We still wake up as the next command comes in
+		BOOST_LOG_SEV(logger(), warning) << "Error reading response: " << boost::diagnostic_information(serr);
+	} catch (const tools::moose_error &merr) {
+		// Not expected at all
+		BOOST_LOG_SEV(logger(), warning) << "Error reading response: " << boost::diagnostic_information(merr);
+	} catch (const std::exception &sex) {
+		// The caller didn't provide callbacks that were nothrow
+		BOOST_LOG_SEV(logger(), error) << "Unexpected exception in read_response(): " << boost::diagnostic_information(sex);
+	}
+}
+
 
 bool MRedisTCPConnection::handle_error(const boost::system::error_code n_errc, const char *n_message) const {
 

@@ -13,6 +13,8 @@
 #include <functional>
 #include <string>
 
+#include <deque>
+
 namespace moose {
 namespace mredis {
 
@@ -27,16 +29,32 @@ class MRedisTCPConnection {
 		MRedisTCPConnection &operator=(const MRedisTCPConnection &) = delete;
 
 		void connect(const std::string &n_server, const boost::uint16_t n_port = 6379);
+
+		/*! @brief shut the connection down.
+			There may still be cancelled handlers on the io_service for it. Make sure you poll before 
+				actually destroying the connections
+		 */
 		void stop() noexcept;
 
-		//! send an unknown command that can be filled by the caller via n_prepare
-		void send_command(std::function<void(std::ostream &n_os)> &&n_prepare, std::function<void(const RESPonse &)> &&n_callback) noexcept;
+		/*! send an unknown command that can be filled by the caller via n_prepare
+			must be called from io_service thread
+		 */
+		void send_command(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept;
+
+
 
 	private:
+
+		//! assume there are some and go send
+		void send_outstanding_requests() noexcept;
+
+
 
 		void send_ping();
 
 		void read_pong();
+
+		void read_response() noexcept;
 
 		void read_response(std::function<void(const RESPonse &)> &&n_callback);
 
@@ -55,10 +73,14 @@ class MRedisTCPConnection {
 		};
 
 		AsyncClient                 &m_parent;
-		boost::asio::ip::tcp::socket m_socket;             //!< Socket for the connection.	
-		boost::asio::streambuf       m_streambuf;          //!< use for reading packets and headers on upstream
-		boost::asio::steady_timer    m_retry_timer;        //!< when buffer is in use, retry after a few micros
-		bool                         m_sending;            //!< streambuf in use
+		boost::asio::ip::tcp::socket m_socket;              //!< Socket for the connection.	
+		boost::asio::streambuf       m_streambuf;           //!< use for reading packets and headers on upstream
+		boost::asio::steady_timer    m_send_retry_timer;    //!< when buffer is in use for sending, retry after a few micros
+		boost::asio::steady_timer    m_receive_retry_timer; //!< when buffer is in use for receiving, retry after a few micros
+		std::deque<mrequest>         m_requests_not_sent;
+		std::deque<Callback>         m_outstanding;
+
+		bool                         m_buffer_busy;        //!< streambuf in use
 		Status                       m_status;             //!< tell where we are in our workflow
 		std::string                  m_serialized_request; //!< whatever we have to say. I optimize for 1024 bytes
 };

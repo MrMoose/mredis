@@ -10,6 +10,8 @@
 #include <boost/variant.hpp>
 #include <boost/cstdint.hpp>
 
+#include <functional>
+
 namespace moose {
 namespace mredis {
 
@@ -18,6 +20,14 @@ typedef boost::variant<
 	std::string,              // 1 string response  (simple or bulk)
 	boost::int64_t            // 2 integer response
 > RESPonse;
+
+typedef std::function<void(const RESPonse &)> Callback;
+
+struct mrequest {
+	std::function<void(std::ostream &n_os)> m_prepare;
+	Callback                                m_callback;
+};
+
 
 }
 }

@@ -67,9 +67,10 @@ void format_ping(std::ostream &n_os) {
 	n_os << karma::format("PING\r\n");
 }
 
-void format_hincrby(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name) {
+void format_hincrby(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name, const boost::int64_t n_incr_by) {
 
-	n_os << karma::format("HINCRBY " << karma::string << " " << karma::string << "\r\n", n_hash_name, n_field_name);
+	n_os << karma::format_delimited("HINCRBY" << karma::string << karma::string << karma::long_long << karma::no_delimit["\r\n"],
+		" ", n_hash_name, n_field_name, n_incr_by);
 }
 
 RESPonse parse_one(std::istream &n_is) {

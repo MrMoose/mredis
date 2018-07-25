@@ -46,13 +46,13 @@ void AsyncClient::connect() {
 	m_connection->connect(m_server);
 }
 
-void AsyncClient::hincrby(const std::string &n_hash_name, const std::string &n_field_name, Callback &&n_callback /*= Callback()*/) noexcept {
+void AsyncClient::hincrby(const std::string &n_hash_name, const std::string &n_field_name,
+		const boost::int64_t n_increment_by, Callback &&n_callback /*= Callback()*/) noexcept {
 
 	MOOSE_ASSERT(m_connection);
 
-
 	m_connection->send_command(
-			[&](std::ostream &n_os) { format_hincrby(n_os, n_hash_name, n_field_name); }
+			[&](std::ostream &n_os) { format_hincrby(n_os, n_hash_name, n_field_name, n_increment_by); }
 	, std::move(n_callback));
 
 }

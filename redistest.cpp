@@ -18,6 +18,8 @@
 #include <iostream>
 #include <cstdlib>
 
+using namespace moose::mredis;
+
 int main(int argc, char **argv) {
 	
 #ifndef _WIN32
@@ -61,11 +63,21 @@ int main(int argc, char **argv) {
 		std::unique_ptr<boost::thread> t(new boost::thread([&]() { io_ctx.run(); }));
 
 
-		moose::mredis::AsyncClient client(io_ctx, "127.0.0.1");
+		AsyncClient client(io_ctx, "127.0.0.1");
 
 		client.connect();
+		boost::this_thread::sleep_for(boost::chrono::seconds(1));
 
-		boost::this_thread::sleep_for(boost::chrono::seconds(5));
+		client.hincrby("myhash", "field", 1, [](const RESPonse &n_response) {
+			
+			if (n_response.which() == 2) {
+				std::cout << "Response: " << boost::get<boost::int64_t>(n_response) << std::endl;
+			}
+		});
+
+
+
+		boost::this_thread::sleep_for(boost::chrono::seconds(1));
 
 		delete work;
 		io_ctx.stop();
