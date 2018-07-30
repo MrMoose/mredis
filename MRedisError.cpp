@@ -5,7 +5,18 @@
 
 #include "MRedisError.hpp"
 
-char const *moose::mredis::redis_error::what() const noexcept {
+namespace moose {
+namespace mredis {
+
+char const *redis_error::what() const noexcept {
 
 	return "redis error";
+}
+
+void redis_error::set_server_message(const std::string &n_message) {
+
+	*this << redis_server_message(n_message);
+}
+
+}
 }

@@ -13,15 +13,20 @@
 #include <boost/thread/future.hpp>
 
 #include <functional>
+#include <vector>
 
 namespace moose {
 namespace mredis {
 
-typedef boost::variant<
-	redis_error,              // 0 wrapped up exception for error cases
-	std::string,              // 1 string response  (simple or bulk)
-	boost::int64_t            // 2 integer response
-> RESPonse;
+struct null_result {};
+
+typedef boost::make_recursive_variant<
+	redis_error,                           // 0 wrapped up exception for error cases
+	std::string,                           // 1 string response  (simple or bulk)
+	boost::int64_t,                        // 2 integer response
+	null_result,                           // 3 null response
+	std::vector<boost::recursive_variant_> // 4 arrays
+>::type RESPonse;
 
 typedef std::function<void(const RESPonse &)> Callback;
 

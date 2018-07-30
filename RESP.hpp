@@ -17,7 +17,8 @@
 namespace moose {
 namespace mredis {
 
-RESPonse parse(const std::string n_input);
+// debug
+MREDIS_API bool parse(const std::string &n_input, RESPonse &n_response);
 
 /*! @defgroup generators to write commands onto the stream
 	Everything that takes stream ptrs asserts when they are null

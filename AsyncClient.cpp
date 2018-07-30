@@ -71,7 +71,7 @@ future_response AsyncClient::hincrby(const std::string &n_hash_name, const std::
 		[promise](const RESPonse &n_response) {
 
 			if (n_response.which() == 0) {
-				promise->set_exception(redis_error());
+				promise->set_exception(boost::get<redis_error>(n_response));
 			} else {
 				promise->set_value(n_response);
 			}

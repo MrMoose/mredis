@@ -7,12 +7,17 @@
 
 #include "tools/Assert.hpp"
 
+#define BOOST_SPIRIT_DEBUG
+#define BOOST_SPIRIT_DEBUG_PRINT_SOME 200
+#define BOOST_SPIRIT_DEBUG_OUT std::cerr
+
 #include <boost/asio.hpp>
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/qi_parse.hpp>
 #include <boost/spirit/include/karma_format.hpp>
 #include <boost/spirit/include/support_multi_pass.hpp>
+#include <boost/spirit/include/phoenix.hpp>
 
 namespace moose {
 namespace mredis {
@@ -20,28 +25,109 @@ namespace mredis {
 namespace qi = boost::spirit::qi;
 namespace ascii = qi::ascii;
 namespace karma = boost::spirit::karma;
+namespace phx = boost::phoenix;
 
 template <typename InputIterator>
 struct simple_string_parser : qi::grammar<InputIterator, std::string()> {
 
-	simple_string_parser() : simple_string_parser::base_type(m_start, "simple_string") {
+	simple_string_parser() : simple_string_parser::base_type(m_simple_start, "simple_string") {
 
 		// The docs are not very specific on what a simple ascii char is. I assume it's char_ except for space and newlines
-		m_start %= '+' >> +(ascii::char_ - qi::eol) >> qi::eol;
+		m_simple_start %= '+' >> +(ascii::char_ - ascii::char_("\r\n")) >> "\r\n";
+
+		BOOST_SPIRIT_DEBUG_NODES((m_simple_start));
 	}
 
-	qi::rule<InputIterator, std::string()>  m_start;
+	qi::rule<InputIterator, std::string()>  m_simple_start;
+};
+
+template <typename InputIterator>
+struct bulk_string_parser : qi::grammar<InputIterator, std::string()> {
+
+	bulk_string_parser()
+			: bulk_string_parser::base_type(m_bulk_start, "bulk_string")
+			, m_size(0) {
+
+		using qi::labels::_1;
+		using qi::_val;
+
+		m_prefix      = '$' >> qi::ulong_[phx::ref(m_size) = _1] >> "\r\n";
+		m_bulk_start %= m_prefix >> qi::repeat(phx::ref(m_size))[qi::char_] >> "\r\n";
+	}
+
+	std::size_t                             m_size;
+	qi::rule<InputIterator>                 m_prefix;
+	qi::rule<InputIterator, std::string()>  m_bulk_start;
+};
+
+template <typename InputIterator>
+struct null_parser : qi::grammar<InputIterator, null_result()> {
+
+	null_parser() : null_parser::base_type(m_null_start, "null") {
+
+		using qi::labels::_1;
+
+		m_null_start = qi::lit("$-1\r\n")[_1 = phx::construct<null_result>()];
+	}
+
+	qi::rule<InputIterator, null_result()>  m_null_start;
 };
 
 template <typename InputIterator>
 struct integer_parser : qi::grammar<InputIterator, boost::int64_t()> {
 
-	integer_parser() : integer_parser::base_type(m_start, "integer") {
+	integer_parser() : integer_parser::base_type(m_int_start, "integer") {
 
-		m_start %= ':' >> qi::long_long >> qi::eol;
+		m_int_start %= ':' >> qi::long_long >> qi::eol;
+		BOOST_SPIRIT_DEBUG_NODE(m_int_start);
 	}
 
-	qi::rule<InputIterator, boost::int64_t()>  m_start;
+	qi::rule<InputIterator, boost::int64_t()>  m_int_start;
+};
+
+template <typename InputIterator>
+struct array_parser : qi::grammar<InputIterator, std::vector<RESPonse> > {
+
+	array_parser() 
+			: array_parser::base_type(m_start, "array")
+			, m_size(0) {
+
+		m_prefix = '*' >> qi::ulong_[phx::ref(m_size) = qi::labels::_1] >> "\r\n";
+
+		// I assume arrays can not contain error or further arrays. Not quite sure about the errors though
+		m_variant %= m_simple_string | m_integer | m_null_result | m_bulk_string;
+
+		m_start %= m_prefix >> qi::repeat(phx::ref(m_size))[m_variant];
+	}
+
+	std::size_t                                      m_size;
+	qi::rule<InputIterator>                          m_prefix;
+	qi::rule<InputIterator, RESPonse()>              m_variant;
+	integer_parser<InputIterator>                    m_integer;
+	simple_string_parser<InputIterator>              m_simple_string;
+	bulk_string_parser<InputIterator>                m_bulk_string;
+	null_parser<InputIterator>                       m_null_result;
+	qi::rule<InputIterator, std::vector<RESPonse> >  m_start;
+};
+
+template <typename InputIterator>
+struct error_parser : qi::grammar<InputIterator, redis_error()> {
+
+	error_parser() : error_parser::base_type(m_start, "error") {
+
+		using qi::_val;
+		using qi::labels::_1;
+
+		// Very similar to basic string but I need a different type		
+		m_error_text %= +(ascii::char_ - qi::eol);
+		
+		m_start = qi::lit('-')[ _val = phx::construct<redis_error>() ] >> 
+				m_error_text[ phx::bind(&redis_error::set_server_message, _val, _1) ] >> qi::eol;
+
+	}
+
+	qi::rule<InputIterator, std::string()>  m_error_text;
+	qi::rule<InputIterator, redis_error()>  m_start;
 };
 
 template <typename InputIterator>
@@ -49,17 +135,24 @@ struct response_parser : qi::grammar<InputIterator, RESPonse()> {
 
 	response_parser() : response_parser::base_type(m_start, "response") {
 	
-		m_start %= m_simple_string | m_integer;
+		m_start %= m_simple_string | m_integer | m_array | m_null_result | m_bulk_string | m_error;
 	}
 
 	integer_parser<InputIterator>        m_integer;
 	simple_string_parser<InputIterator>  m_simple_string;
+	bulk_string_parser<InputIterator>    m_bulk_string;
+	null_parser<InputIterator>           m_null_result;
+	array_parser<InputIterator>          m_array;
+	error_parser<InputIterator>          m_error;
 	qi::rule<InputIterator, RESPonse()>  m_start;
 };
 
-RESPonse parse(const std::string n_input) {
+bool parse(const std::string &n_input, RESPonse &n_response) {
 
-	return 0;
+	std::string::const_iterator first = n_input.cbegin();
+	const std::string::const_iterator last = n_input.cend();
+	response_parser<std::string::const_iterator> p;
+	return qi::parse(first, last, p, n_response);
 }
 
 void format_ping(std::ostream &n_os) {

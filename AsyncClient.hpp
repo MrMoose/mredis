@@ -45,12 +45,15 @@ class AsyncClient {
 		 */
 		MREDIS_API void connect();
 
-		void set(const std::string &n_name, const std::string   &n_value);
-		void set(const std::string &n_name, const boost::int64_t n_value);
-
+		/*! @defgroup basic functions
+			They all assert when connect wasn't called.
+			@{
+		*/
+	
+		/*! @} */
 
 		/*! @defgroup hash map functions
-			They all assert when connect wasn't called.
+			They too assert when connect wasn't called.
 			@{
 		*/
 
@@ -68,12 +71,23 @@ class AsyncClient {
 		/*! @brief hash map field increment
 			@param n_hash_name assert on empty
 			@param n_field_name assumed to be an integer field
-			@returns future which will hold response
+			@returns future which will hold response, may also hold exception
 			@see https://redis.io/commands/hincrby
 		*/
 		MREDIS_API future_response hincrby(const std::string &n_hash_name,
-		                             const std::string &n_field_name,
-		                             const boost::int64_t n_increment_by) noexcept;
+		                        const std::string &n_field_name,
+		                        const boost::int64_t n_increment_by) noexcept;
+
+		/*! @brief hash map field get
+			@param n_hash_name assert on empty
+			@param n_field_name 
+			@param n_callback must be no-throw
+			@see https://redis.io/commands/hincrby
+		*/
+		MREDIS_API void hmget(const std::string &n_hash_name,
+		                        const std::string &n_field_name,
+		                        const boost::int64_t n_increment_by,
+		                        Callback &&n_callback) noexcept;
 
 		/*! @} */
 
