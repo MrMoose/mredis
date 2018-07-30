@@ -57,13 +57,23 @@ class AsyncClient {
 		/*! @brief hash map field increment
 			@param n_hash_name assert on empty
 			@param n_field_name assumed to be an integer field
-			@param n_callback if set, must be no-throw
+			@param n_callback must be no-throw
 			@see https://redis.io/commands/hincrby
 		 */
 		MREDIS_API void hincrby(const std::string &n_hash_name,
 		                        const std::string &n_field_name,
-								const boost::int64_t n_increment_by = 1,
-		                        Callback &&n_callback = Callback()) noexcept;
+		                        const boost::int64_t n_increment_by,
+		                        Callback &&n_callback) noexcept;
+
+		/*! @brief hash map field increment
+			@param n_hash_name assert on empty
+			@param n_field_name assumed to be an integer field
+			@returns future which will hold response
+			@see https://redis.io/commands/hincrby
+		*/
+		MREDIS_API future_response hincrby(const std::string &n_hash_name,
+		                             const std::string &n_field_name,
+		                             const boost::int64_t n_increment_by) noexcept;
 
 		/*! @} */
 

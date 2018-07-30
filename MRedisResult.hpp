@@ -7,8 +7,10 @@
 #include "MRedisConfig.hpp"
 #include "MRedisError.hpp"
 
+#define BOOST_THREAD_PROVIDES_FUTURE
 #include <boost/variant.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/thread/future.hpp>
 
 #include <functional>
 
@@ -28,6 +30,10 @@ struct mrequest {
 	Callback                                m_callback;
 };
 
+typedef boost::future<RESPonse>              future_response;
+
+typedef boost::promise<RESPonse>             promised_response;
+typedef boost::shared_ptr<promised_response> promised_response_ptr;
 
 }
 }

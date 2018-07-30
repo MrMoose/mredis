@@ -36,6 +36,10 @@ MREDIS_API void format_hincrby(std::ostream &n_os, const std::string &n_hash_nam
 
 MREDIS_API RESPonse parse_one(std::istream &n_is);
 
+/*! Parse one message from the stream.
+	@return false on cannot parse any
+ */
+MREDIS_API bool parse_from_stream(std::istream &n_is, RESPonse &n_response) noexcept;
 
 
 

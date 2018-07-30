@@ -32,15 +32,15 @@ MRedisTCPConnection::MRedisTCPConnection(AsyncClient &n_parent)
 }
 
 MRedisTCPConnection::~MRedisTCPConnection() noexcept {
-	
-	m_send_retry_timer.cancel();
-	m_receive_retry_timer.cancel();
+
 }
 
 void MRedisTCPConnection::connect(const std::string &n_server, const boost::uint16_t n_port) {
 
 	BOOST_LOG_FUNCTION();
 	BOOST_LOG_SEV(logger(), debug) << "Connecting to TCP redis server on " << n_server << ":" << n_port;
+
+	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
 	m_status = Status::Connecting;
 
@@ -51,18 +51,64 @@ void MRedisTCPConnection::connect(const std::string &n_server, const boost::uint
 		BOOST_THROW_EXCEPTION(network_error() << error_message("Cannot resolve host name") << error_argument(n_server));
 	}
 
+	// I believe connect() should be sync so I catch the result in here.
+	promised_response_ptr promise(boost::make_shared<promised_response>());
+	future_response res = promise->get_future(); 
+
 	asio::async_connect(m_socket, resolved_endpoints,
-		[this, n_server](const boost::system::error_code &n_errc, const ip::tcp::endpoint &n_endpoint) {
+		[this, promise, n_server](const boost::system::error_code &n_errc, const ip::tcp::endpoint &n_endpoint) {
 
 			if (n_errc) {
 				BOOST_LOG_SEV(logger(), warning) << "Could not connect to redis server '" << n_server << "': " << n_errc.message();
-				stop();
+				stop();			
+				promise->set_exception(redis_error() << error_message("Could not connect"));
 				return;
 			}
 
 			// send a ping to say hello. Only one ping though, Vassily
-			send_ping();
+			{
+				std::ostream os(&m_streambuf);
+				format_ping(os);
+			}
+
+			m_outstanding.emplace_back([this, promise](const RESPonse &n_response) {
+				promise->set_value(n_response);
+			});
+
+			// send the content of the streambuf to redis
+			asio::async_write(m_socket, m_streambuf,
+				[this](const boost::system::error_code n_errc, const std::size_t n_bytes_sent) {
+
+					if (handle_error(n_errc, "sending ping to server")) {
+						stop();
+						return;
+					}
+
+					read_response();
+			});
 	});
+
+	RESPonse r = res.get();
+
+	if (r.which() != 1) {
+		BOOST_LOG_SEV(logger(), error) << "Server did not pong";
+		stop();
+		BOOST_THROW_EXCEPTION(network_error() << error_message("Server did not respond to ping"));
+	}
+
+	if (!boost::algorithm::equals(boost::get<std::string>(r), "PONG")) {
+		BOOST_LOG_SEV(logger(), error) << "Server did not pong";
+		stop();
+		BOOST_THROW_EXCEPTION(network_error() << error_message("Server did not respond to ping with PONG"));
+	}
+
+	// Normally, connections are pushing. Meaning they send commands actively 
+	// as opposed to reading the socket for subscription channel messages
+	m_status = Status::Pushing;
+	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+
+	BOOST_LOG_SEV(logger(), normal) << "Connected to redis in " << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() << "ms";
+	return;
 }
 
 void MRedisTCPConnection::stop() noexcept {
@@ -70,81 +116,24 @@ void MRedisTCPConnection::stop() noexcept {
 	BOOST_LOG_FUNCTION();
 	BOOST_LOG_SEV(logger(), normal) << "MRedis TCP connection shutting down";
 
+	if (m_status == Status::ShuttingDown || m_status == Status::Shutdown) {
+		BOOST_LOG_SEV(logger(), warning) << "Please don't stop TCP connection twice";
+		return;
+	}
+
+	m_status = Status::ShuttingDown;
+
 	m_send_retry_timer.cancel();
 	m_receive_retry_timer.cancel();
 
-	m_status = Status::Shutdown;
-
 	boost::system::error_code ec;
-	m_socket.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-	if (ec) {
-		BOOST_LOG_SEV(logger(), warning) << "Error shutting down Redis connection: " << ec.message() << " .. don't worry about that.";
-	}
-
 	m_socket.close(ec);
 	if (ec) {
 		BOOST_LOG_SEV(logger(), warning) << "Error closing down Redis connection: " << ec.message() << " .. don't worry about that.";
 	}
 }
 
-void MRedisTCPConnection::send_ping() {
-
-	std::ostream os(&m_streambuf);
-	format_ping(os);
-
-	// and send
-	asio::async_write(m_socket, m_streambuf,
-		[this](const boost::system::error_code n_errc, const std::size_t n_bytes_sent) {
-
-			if (handle_error(n_errc, "writing initial ping")) { stop(); return; }
-
-			read_pong();
-
-			m_status = Status::Connected;
-			BOOST_LOG_SEV(logger(), normal) << "Connected to redis via TCP";
-	});
-}
-
-
-void MRedisTCPConnection::read_pong() {
-
-	read_response([this](const RESPonse &n_response) {
-
-		if (n_response.which() != 1) {
-			BOOST_LOG_SEV(logger(), error) << "Server did not pong";
-			stop();
-			return;
-		}
-
-		if (!boost::algorithm::equals(boost::get<std::string>(n_response), "PONG")) {
-			BOOST_LOG_SEV(logger(), error) << "Server did not pong";
-			stop();
-			return;
-		}
-
-		// Normally, connections are pushing. Meaning they send commands actively 
-		// as opposed to reading the socket for subscription channel messages
-		m_status = Status::Pushing;
-		BOOST_LOG_SEV(logger(), normal) << "Connected to redis";
-	});
-}
-
-void MRedisTCPConnection::read_response(std::function<void(const RESPonse &)> &&n_callback) {
-
-	// read one response and evaluate
-	asio::async_read_until(m_socket, m_streambuf, "\r\n",
-		[this, n_callback](const boost::system::error_code n_errc, const std::size_t) {
-
-			if (handle_error(n_errc, "reading response")) { stop(); return; }
-
-			std::istream is(&m_streambuf);
-
-			RESPonse r = parse_one(is);
-			n_callback(r);
-	});
-}
-
-void MRedisTCPConnection::send_command(std::function<void(std::ostream &n_os)> &&n_prepare, std::function<void(const RESPonse &)> &&n_callback) noexcept {
+void MRedisTCPConnection::send_command(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept {
 	
 	MOOSE_ASSERT_MSG(n_prepare, "stream preparation function must be given");
 
@@ -157,9 +146,7 @@ void MRedisTCPConnection::send_command(std::function<void(std::ostream &n_os)> &
 		// if the streambuf is in use we cannot push data into it
 		// we have to wait for it to become available. We store both handlers until later
 		if (m_buffer_busy) {
-			mrequest req;
-			req.m_prepare = std::move(n_prepare);
-			req.m_callback = std::move(n_callback);
+			mrequest req{ std::move(n_prepare) , std::move(n_callback) };
 			m_requests_not_sent.emplace_back(std::move(req));
 
 			// I will only post a wait handler if the queue of outstanding 
@@ -188,14 +175,14 @@ void MRedisTCPConnection::send_command(std::function<void(std::ostream &n_os)> &
 			// See if we have unsent requests and stream them first in the order they came in
 			for (mrequest &req : m_requests_not_sent) {
 				req.m_prepare(os);
-				m_outstanding.emplace_back(req.m_callback);
+				m_outstanding.emplace_back(std::move(req.m_callback));
 			}
 
 			m_requests_not_sent.clear();
 
 			// The caller told us what he wants to put into the command
 			n_prepare(os);
-			m_outstanding.emplace_back(n_callback);
+			m_outstanding.emplace_back(std::move(n_callback));
 		}
 
 		// send the content of the streambuf to redis
@@ -205,6 +192,10 @@ void MRedisTCPConnection::send_command(std::function<void(std::ostream &n_os)> &
 				m_buffer_busy = false;
 				if (handle_error(n_errc, "sending command(s) to server")) {
 					stop();
+					return;
+				}
+
+				if (m_status >= Status::ShuttingDown) {
 					return;
 				}
 
@@ -229,7 +220,7 @@ void MRedisTCPConnection::send_outstanding_requests() noexcept {
 	try {
 		// if the streambuf is still in use we have to wait
 		// we have to wait for it to become available. We store both handlers until later
-		if (m_buffer_busy) {		
+		if (m_buffer_busy) {
 			m_send_retry_timer.expires_after(asio::chrono::milliseconds(1));
 			m_send_retry_timer.async_wait(
 				[this](const boost::system::error_code &n_err) {
@@ -249,10 +240,12 @@ void MRedisTCPConnection::send_outstanding_requests() noexcept {
 		{
 			std::ostream os(&m_streambuf);
 
+			BOOST_LOG_SEV(logger(), debug) << "Sending " << m_requests_not_sent.size() << " outstanding requests";
+
 			// See if we have unsent requests and stream them first in the order they came in
 			for (mrequest &req : m_requests_not_sent) {
 				req.m_prepare(os);
-				m_outstanding.emplace_back(req.m_callback);
+				m_outstanding.emplace_back(std::move(req.m_callback));
 			}
 
 			m_requests_not_sent.clear();
@@ -260,11 +253,15 @@ void MRedisTCPConnection::send_outstanding_requests() noexcept {
 
 		// send the content of the streambuf to redis
 		asio::async_write(m_socket, m_streambuf,
-			[this](const boost::system::error_code n_errc, const std::size_t n_bytes_sent) {
+			[this](const boost::system::error_code n_errc, const std::size_t) {
 
 				m_buffer_busy = false;
 				if (handle_error(n_errc, "sending command(s) to server")) {
 					stop();
+					return;
+				}
+
+				if (m_status >= Status::ShuttingDown) {
 					return;
 				}
 
@@ -285,16 +282,19 @@ void MRedisTCPConnection::send_outstanding_requests() noexcept {
 
 void MRedisTCPConnection::read_response() noexcept {
 
+	if (m_status >= Status::ShuttingDown) {
+		return;
+	}
+
 	try {
 		// if the streambuf is in use we cannot push data into it
 		// we have to wait for it to become available. We store both handlers until later
 		if (m_buffer_busy) {
-			
 			// I will only post a wait handler if the queue of outstanding 
 			// responses is not empty to avoid having multiple in flight
 			if (m_outstanding.size() > 0) {
-				m_send_retry_timer.expires_after(asio::chrono::milliseconds(1));
-				m_send_retry_timer.async_wait(
+				m_receive_retry_timer.expires_after(asio::chrono::milliseconds(1));
+				m_receive_retry_timer.async_wait(
 					[this](const boost::system::error_code &n_err) {
 
 						if (!n_err && this->m_status == Status::Pushing) {
@@ -305,17 +305,38 @@ void MRedisTCPConnection::read_response() noexcept {
 			return;
 		}
 		
-		if (m_outstanding.empty()) {
-			return;
-		}
-
 		// we have waited for our buffer to become available. Right now I assume there is 
 		// no async operation in progress on it
 		MOOSE_ASSERT((!m_buffer_busy));
 		m_buffer_busy = true;
 
+		// perhaps we already have bytes to read in our streambuf. If so, I parse those first
+		while (m_outstanding.size() && m_streambuf.size()) {
+		
+			std::istream is(&m_streambuf);
+			RESPonse r;
+				
+			// As long as we can parse messages from our stream, continue to do so.
+			bool success = parse_from_stream(is, r);
+			if (success) {
+				m_outstanding.front()(r);
+				m_outstanding.pop_front();
+			} else {
+				break;
+			}
+		}
+
+		// If there's nothing left to read, exit this strand
+		if (m_outstanding.empty()) {
+			m_buffer_busy = false;
+			return;
+		}
+
+		// Otherwise read more from the socket
+		BOOST_LOG_SEV(logger(), debug) << "Reading more response";
+
 		// read one response and evaluate
-		asio::async_read_until(m_socket, m_streambuf, "\r\n",
+		asio::async_read(m_socket, m_streambuf, asio::transfer_at_least(1),
 			[this](const boost::system::error_code n_errc, const std::size_t) {
 
 				if (handle_error(n_errc, "reading response")) {
@@ -323,15 +344,15 @@ void MRedisTCPConnection::read_response() noexcept {
 					stop();
 					return;
 				}
+				
+				m_buffer_busy = false;
 
-				{
-					std::istream is(&m_streambuf);
-					RESPonse r = parse_one(is);
-					m_outstanding.front()(r);
-					m_outstanding.pop_front();
+				if (m_status >= Status::ShuttingDown) {
+					BOOST_LOG_SEV(logger(), normal) << "Shutting down, not reading any more responses. There are " << m_outstanding.size() << " callbacks left";
+					return;
 				}
 
-				m_buffer_busy = false;
+				// this is going to parse
 				read_response();
 			});
 	} catch (const boost::system::system_error &serr) {

@@ -28,6 +28,7 @@ class MRedisTCPConnection {
 		virtual ~MRedisTCPConnection() noexcept;
 		MRedisTCPConnection &operator=(const MRedisTCPConnection &) = delete;
 
+		//! This blocks until connected or throws on error
 		void connect(const std::string &n_server, const boost::uint16_t n_port = 6379);
 
 		/*! @brief shut the connection down.
@@ -48,15 +49,8 @@ class MRedisTCPConnection {
 		//! assume there are some and go send
 		void send_outstanding_requests() noexcept;
 
-
-
-		void send_ping();
-
-		void read_pong();
-
 		void read_response() noexcept;
 
-		void read_response(std::function<void(const RESPonse &)> &&n_callback);
 
 		//! when handling error conditions after async ops, use this to save some lines
 		//! @return true when error should cause closing of the connection
@@ -69,6 +63,7 @@ class MRedisTCPConnection {
 			Connected,
 			Pushing,
 			Pulling,
+			ShuttingDown,
 			Shutdown
 		};
 

@@ -89,7 +89,19 @@ RESPonse parse_one(std::istream &n_is) {
 	} else {
 		return result;
 	}
+}
 
+bool parse_from_stream(std::istream &n_is, RESPonse &n_response) noexcept {
+
+	typedef std::istreambuf_iterator<char> base_iterator_type;
+	boost::spirit::multi_pass<base_iterator_type> first =
+		boost::spirit::make_default_multi_pass(base_iterator_type(n_is));
+	boost::spirit::multi_pass<base_iterator_type> last =
+		boost::spirit::make_default_multi_pass(base_iterator_type());
+
+	response_parser<boost::spirit::multi_pass<base_iterator_type> > p;
+
+	return qi::parse(first, last, p, n_response);
 }
 
 }

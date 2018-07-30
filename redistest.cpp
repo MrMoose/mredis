@@ -5,6 +5,8 @@
 
 #include "mredis/AsyncClient.hpp"
 
+#include "tools/Log.hpp"
+
 #include <boost/config.hpp>
 #include <boost/thread.hpp>
 #include <boost/asio.hpp>
@@ -20,6 +22,17 @@
 
 using namespace moose::mredis;
 
+void output_result(future_response &n_response) {
+
+	RESPonse response = n_response.get();
+
+	if (response.which() == 2) {
+		std::cout << "Response: " << boost::get<boost::int64_t>(response) << std::endl;
+	} else {
+		std::cerr << "Unexpected response: " << response.which() << std::endl;
+	};
+}
+
 int main(int argc, char **argv) {
 	
 #ifndef _WIN32
@@ -29,6 +42,7 @@ int main(int argc, char **argv) {
 	setrlimit(RLIMIT_CORE, &core_limits);
 #endif
 
+	moose::tools::init_logging();
 
 	namespace po = boost::program_options;
 
@@ -63,27 +77,65 @@ int main(int argc, char **argv) {
 		std::unique_ptr<boost::thread> t(new boost::thread([&]() { io_ctx.run(); }));
 
 
-		AsyncClient client(io_ctx, "127.0.0.1");
+		{
 
-		client.connect();
-		boost::this_thread::sleep_for(boost::chrono::seconds(1));
+			AsyncClient client(io_ctx, "127.0.0.1");
 
-		client.hincrby("myhash", "field", 1, [](const RESPonse &n_response) {
-			
-			if (n_response.which() == 2) {
-				std::cout << "Response: " << boost::get<boost::int64_t>(n_response) << std::endl;
-			}
-		});
+			client.connect();
+
+// 			client.hincrby("myhash", "field", 1, [](const RESPonse &n_response) {
+// 
+// 				if (n_response.which() == 2) {
+// 					std::cout << "Response: " << boost::get<boost::int64_t>(n_response) << std::endl;
+// 				} else {
+// 					std::cerr << "Unexpected response: " << n_response.which() << std::endl;
+// 				}
+// 			});
+
+			future_response fr1 = client.hincrby("myhash", "field", 1);
+			future_response fr2 = client.hincrby("myhash", "field", 1);
+			future_response fr3 = client.hincrby("myhash", "field", 1);
+			future_response fr4 = client.hincrby("myhash", "field", 1);
+			future_response fr5 = client.hincrby("myhash", "field", 1);
+			future_response fr6 = client.hincrby("myhash", "field", 1);
+			future_response fr7 = client.hincrby("myhash", "field", 1);
+
+			output_result(fr1);
+			output_result(fr2);
+			output_result(fr3);
+			output_result(fr4);
+			output_result(fr5);
+			output_result(fr6);
+			output_result(fr7);
+
+			std::cout << "Wait a sec... " << std::endl;
+			boost::this_thread::sleep_for(boost::chrono::seconds(1));
+			std::cout << "Again!" << std::endl;
+
+			future_response fr8 = client.hincrby("myhash", "field", 1);
+			future_response fr9 = client.hincrby("myhash", "field", 1);
+			future_response fr10 = client.hincrby("myhash", "field", 1);
+			future_response fr11 = client.hincrby("myhash", "field", 1);
+			future_response fr12 = client.hincrby("myhash", "field", 1);
+			future_response fr13 = client.hincrby("myhash", "field", 1);
+			future_response fr14 = client.hincrby("myhash", "field", 1);
+
+			output_result(fr8);
+			output_result(fr9);
+			output_result(fr10);
+			output_result(fr11);
+			output_result(fr12);
+			output_result(fr13);
+			output_result(fr14);
+		}
 
 
-
-		boost::this_thread::sleep_for(boost::chrono::seconds(1));
-
+		std::cout << "shutting down" << std::endl;
 		delete work;
 		io_ctx.stop();
 		t->join();
 
-
+		std::cout << "done" << std::endl;
 
 	} catch (const std::exception &sex) {
 		std::cerr << "Unexpected exception reached main: " << sex.what() << std::endl;
