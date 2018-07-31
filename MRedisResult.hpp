@@ -7,7 +7,7 @@
 #include "MRedisConfig.hpp"
 #include "MRedisError.hpp"
 
-#define BOOST_THREAD_PROVIDES_FUTURE
+//#define BOOST_THREAD_PROVIDES_FUTURE
 #include <boost/variant.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/thread/future.hpp>

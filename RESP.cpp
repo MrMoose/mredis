@@ -6,10 +6,10 @@
 #include "RESP.hpp"
 
 #include "tools/Assert.hpp"
-
-#define BOOST_SPIRIT_DEBUG
-#define BOOST_SPIRIT_DEBUG_PRINT_SOME 200
-#define BOOST_SPIRIT_DEBUG_OUT std::cerr
+// 
+// #define BOOST_SPIRIT_DEBUG
+// #define BOOST_SPIRIT_DEBUG_PRINT_SOME 200
+// #define BOOST_SPIRIT_DEBUG_OUT std::cerr
 
 #include <boost/asio.hpp>
 #include <boost/spirit/include/qi.hpp>
@@ -53,6 +53,8 @@ struct bulk_string_parser : qi::grammar<InputIterator, std::string()> {
 
 		m_prefix      = '$' >> qi::ulong_[phx::ref(m_size) = _1] >> "\r\n";
 		m_bulk_start %= m_prefix >> qi::repeat(phx::ref(m_size))[qi::char_] >> "\r\n";
+
+		BOOST_SPIRIT_DEBUG_NODES((m_prefix)(m_bulk_start));
 	}
 
 	std::size_t                             m_size;

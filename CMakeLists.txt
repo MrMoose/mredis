@@ -6,9 +6,12 @@
 cmake_minimum_required(VERSION 3.4)
 project(mredis)
 
+add_definitions(-DBOOST_THREAD_VERSION=4)
+
 find_package(Boost 1.67.0 COMPONENTS chrono thread system program_options log unit_test_framework  REQUIRED)
 
 set(MREDIS_SRC
+	FwdDeclarations.cpp
 	AsyncClient.cpp
 	RESP.cpp
 	MRedisResult.cpp
@@ -17,6 +20,7 @@ set(MREDIS_SRC
 	)
 
 set(MREDIS_HDR
+	FwdDeclarations.hpp
 	MRedisConfig.hpp
 	AsyncClient.hpp
 	RESP.hpp
