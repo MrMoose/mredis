@@ -111,6 +111,77 @@ void MRedisTCPConnection::connect(const std::string &n_server, const boost::uint
 	return;
 }
 
+void MRedisTCPConnection::async_connect(const std::string &n_server, const boost::uint16_t n_port, boost::shared_ptr<boost::promise<bool> > n_ret) {
+	
+	BOOST_LOG_FUNCTION();
+	BOOST_LOG_SEV(logger(), debug) << "Async connecting to TCP redis server on " << n_server << ":" << n_port;
+
+	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+
+	m_status = Status::Connecting;
+
+	ip::tcp::resolver resolver(m_parent.m_io_context);
+	ip::tcp::resolver::query query(n_server, boost::lexical_cast<std::string>(n_port), ip::tcp::resolver::query::numeric_service);
+	ip::tcp::resolver::results_type resolved_endpoints = resolver.resolve(query);
+	if (resolved_endpoints.empty()) {
+		n_ret->set_exception(redis_error() << error_message("Cannot resolve host name") << error_argument(n_server));
+		return;
+	}
+
+	asio::async_connect(m_socket, resolved_endpoints,
+		[this, n_ret, n_server, start](const boost::system::error_code &n_errc, const ip::tcp::endpoint &n_endpoint) {
+
+			if (n_errc) {
+				BOOST_LOG_SEV(logger(), warning) << "Could not connect to redis server '" << n_server << "': " << n_errc.message();
+				stop();
+				n_ret->set_exception(redis_error() << error_message("Could not connect") << error_argument(n_server));
+				return;
+			}
+
+			// send a ping to say hello. Only one ping though, Vassily
+			{
+				std::ostream os(&m_streambuf);
+				format_ping(os);
+			}
+
+			// Put a callback into the expected responses queue to know what we do when ping returns
+			m_outstanding.emplace_back([this, n_ret, start](const RESPonse &n_response) {
+
+				if (n_response.which() == 0) {
+					n_ret->set_exception(boost::get<redis_error>(n_response));
+					return;
+				}
+
+				if (n_response.which() != 1 || !boost::algorithm::equals(boost::get<std::string>(n_response), "PONG")) {
+					n_ret->set_exception(redis_error() << error_message("Server did not pong"));
+					return;
+				}
+
+				// Normally, connections are pushing. Meaning they send commands actively 
+				// as opposed to reading the socket for subscription channel messages
+				m_status = Status::Pushing;
+				const std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+	
+				BOOST_LOG_SEV(logger(), normal) << "Connected to redis in " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
+				n_ret->set_value(true);
+			});
+
+			// send the content of the streambuf to redis
+			asio::async_write(m_socket, m_streambuf,
+				[this, n_ret](const boost::system::error_code n_errc, const std::size_t n_bytes_sent) {
+
+					if (handle_error(n_errc, "sending ping to server")) {
+						stop();
+						return;
+					}
+
+					read_response();
+			});
+	});
+
+	return;
+}
+
 void MRedisTCPConnection::stop() noexcept {
 
 	BOOST_LOG_FUNCTION();

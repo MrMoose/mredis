@@ -31,6 +31,10 @@ class MRedisTCPConnection {
 		//! This blocks until connected or throws on error
 		void connect(const std::string &n_server, const boost::uint16_t n_port = 6379);
 
+		//! This doesn't block and sets promise upon done
+		void async_connect(const std::string &n_server, const boost::uint16_t n_port, boost::shared_ptr<boost::promise<bool> > n_ret);
+
+
 		/*! @brief shut the connection down.
 			There may still be cancelled handlers on the io_service for it. Make sure you poll before 
 				actually destroying the connections

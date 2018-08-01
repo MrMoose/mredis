@@ -39,11 +39,18 @@ class AsyncClient {
 
 		MREDIS_API virtual ~AsyncClient() noexcept;
 
-		/*! connect right away
+		/*! @brief sync connect and block until connected
 			@note if already connected, will re-connect
 			@throw network_error on cannot resolve host name
 		 */
 		MREDIS_API void connect();
+
+		/*! @brief start async connect, return immediately
+			Once connected, returned future will turn true for OK or false for not OK
+			@note if already connected, will re-connect
+			@throw network_error on cannot resolve host name
+		 */
+		MREDIS_API boost::shared_future<bool> async_connect();
 
 		/*! @defgroup basic functions
 			They all assert when connect wasn't called.
@@ -100,6 +107,7 @@ class AsyncClient {
 
 		boost::asio::io_context             &m_io_context;
 		const std::string                    m_server;         //!< if tcp, is set to server
+		const boost::uint16_t                m_port;
 		std::unique_ptr<MRedisTCPConnection> m_connection;
 
 		// Each client

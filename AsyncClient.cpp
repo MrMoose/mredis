@@ -13,13 +13,15 @@ namespace mredis {
 
 AsyncClient::AsyncClient(boost::asio::io_context &n_io_context)
 		: m_io_context(n_io_context)
-		, m_server() {
+		, m_server()
+		, m_port(0) {
 
 }
 
 AsyncClient::AsyncClient(boost::asio::io_context &n_io_context, const std::string &n_server, const boost::uint16_t n_port /*= 6379*/)
 		: m_io_context(n_io_context)
-		, m_server(n_server) {
+		, m_server(n_server)
+		, m_port(n_port) {
 
 	MOOSE_ASSERT((!n_server.empty()));
 
@@ -45,7 +47,26 @@ void AsyncClient::connect() {
 	MOOSE_ASSERT(!m_connection);
 
 	m_connection.reset(new MRedisTCPConnection(*this));
-	m_connection->connect(m_server);
+	m_connection->connect(m_server, m_port);
+}
+
+boost::shared_future<bool> AsyncClient::async_connect() {
+
+	if (m_connection) {
+		m_connection->stop();
+		m_io_context.poll();
+		m_connection.reset();
+	}
+
+	MOOSE_ASSERT(!m_connection);
+
+	m_connection.reset(new MRedisTCPConnection(*this));
+
+	boost::shared_ptr<boost::promise<bool> > promise(boost::make_shared<boost::promise<bool> >());
+
+	m_connection->async_connect(m_server, m_port, promise);
+
+	return promise->get_future();
 }
 
 void AsyncClient::hincrby(const std::string &n_hash_name, const std::string &n_field_name,
