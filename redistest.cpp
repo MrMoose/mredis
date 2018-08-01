@@ -48,9 +48,9 @@ int main(int argc, char **argv) {
 
 	po::options_description desc("redis test options");
 	desc.add_options()
-		("help,h", "Print this help message");
+		("help,h", "Print this help message")
 // 		("port,p", po::value<short>()->default_value(7777), "use server port")
-// 		("server,s", po::value<std::string>()->default_value("127.0.0.1"), "give server ip");
+		("server,s", po::value<std::string>()->default_value("127.0.0.1"), "give redis server ip");
 
 	try {
 		po::variables_map vm;
@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
 // 			return EXIT_FAILURE;
 // 		}
 // 
-// 		const std::string server_ip_string = vm["server"].as<std::string>();
+		const std::string server_ip_string = vm["server"].as<std::string>();
 // 		const short port = vm["port"].as<short>();
 
 		boost::asio::io_context io_ctx;
@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
 
 		{
 
-			AsyncClient client(io_ctx, "127.0.0.1");
+			AsyncClient client(io_ctx, server_ip_string);
 
 			client.connect();
 
