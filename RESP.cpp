@@ -35,7 +35,7 @@ struct simple_string_parser : qi::grammar<InputIterator, std::string()> {
 		// The docs are not very specific on what a simple ascii char is. I assume it's char_ except for space and newlines
 		m_simple_start %= '+' >> +(ascii::char_ - ascii::char_("\r\n")) >> "\r\n";
 
-		BOOST_SPIRIT_DEBUG_NODES((m_simple_start));
+//		BOOST_SPIRIT_DEBUG_NODES((m_simple_start));
 	}
 
 	qi::rule<InputIterator, std::string()>  m_simple_start;
@@ -54,7 +54,7 @@ struct bulk_string_parser : qi::grammar<InputIterator, std::string()> {
 		m_prefix      = '$' >> qi::ulong_[phx::ref(m_size) = _1] >> "\r\n";
 		m_bulk_start %= m_prefix >> qi::repeat(phx::ref(m_size))[qi::char_] >> "\r\n";
 
-		BOOST_SPIRIT_DEBUG_NODES((m_prefix)(m_bulk_start));
+//		BOOST_SPIRIT_DEBUG_NODES((m_prefix)(m_bulk_start));
 	}
 
 	std::size_t                             m_size;
@@ -81,7 +81,7 @@ struct integer_parser : qi::grammar<InputIterator, boost::int64_t()> {
 	integer_parser() : integer_parser::base_type(m_int_start, "integer") {
 
 		m_int_start %= ':' >> qi::long_long >> qi::eol;
-		BOOST_SPIRIT_DEBUG_NODE(m_int_start);
+//		BOOST_SPIRIT_DEBUG_NODE(m_int_start);
 	}
 
 	qi::rule<InputIterator, boost::int64_t()>  m_int_start;
@@ -125,7 +125,6 @@ struct error_parser : qi::grammar<InputIterator, redis_error()> {
 		
 		m_start = qi::lit('-')[ _val = phx::construct<redis_error>() ] >> 
 				m_error_text[ phx::bind(&redis_error::set_server_message, _val, _1) ] >> qi::eol;
-
 	}
 
 	qi::rule<InputIterator, std::string()>  m_error_text;
@@ -165,7 +164,13 @@ void format_ping(std::ostream &n_os) {
 void format_hincrby(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name, const boost::int64_t n_incr_by) {
 
 	n_os << karma::format_delimited("HINCRBY" << karma::string << karma::string << karma::long_long << karma::no_delimit["\r\n"],
-		" ", n_hash_name, n_field_name, n_incr_by);
+			" ", n_hash_name, n_field_name, n_incr_by);
+}
+
+void format_sadd(std::ostream &n_os, const std::string &n_set_name, const std::string &n_value) {
+
+	n_os << karma::format_delimited("SADD" << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
+			" ", n_set_name, n_value);
 }
 
 RESPonse parse_one(std::istream &n_is) {
@@ -186,6 +191,11 @@ RESPonse parse_one(std::istream &n_is) {
 	}
 }
 
+// since we should only be parsing from one thread,
+// it should be safe to re-use one object
+typedef std::istreambuf_iterator<char> stream_iterator_type;
+response_parser<boost::spirit::multi_pass<stream_iterator_type> > s_response_parser;
+
 bool parse_from_stream(std::istream &n_is, RESPonse &n_response) noexcept {
 
 	typedef std::istreambuf_iterator<char> base_iterator_type;
@@ -194,9 +204,9 @@ bool parse_from_stream(std::istream &n_is, RESPonse &n_response) noexcept {
 	boost::spirit::multi_pass<base_iterator_type> last =
 		boost::spirit::make_default_multi_pass(base_iterator_type());
 
-	response_parser<boost::spirit::multi_pass<base_iterator_type> > p;
+//	response_parser<boost::spirit::multi_pass<base_iterator_type> > p;
 
-	return qi::parse(first, last, p, n_response);
+	return qi::parse(first, last, s_response_parser, n_response);
 }
 
 }

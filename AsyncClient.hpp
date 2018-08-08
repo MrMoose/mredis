@@ -98,19 +98,42 @@ class AsyncClient {
 
 		/*! @} */
 
+
+		/*! @defgroup unordered set functions
+			They too assert when connect wasn't called.
+			@{
+		*/
+
+		/*! @brief set add
+			@param n_set_name the name of your set
+			@param n_value what to insert
+			@param n_callback must be no-throw
+			@see https://redis.io/commands/sadd
+		*/
+		MREDIS_API void sadd(const std::string &n_set_name,
+		                        const std::string &n_value,
+		                        Callback &&n_callback) noexcept;
+
+		/*! @brief set add
+			@param n_set_name the name of your set
+			@param n_value what to insert
+			
+			@returns future int with number of items added, may also hold exception
+			@see https://redis.io/commands/sadd
+		*/
+		MREDIS_API future_response sadd(const std::string &n_set_name, const std::string &n_value) noexcept;
+
+
+		/*! @} */
+
 	private:
 
 		friend class MRedisTCPConnection;
-
-
-
 
 		boost::asio::io_context             &m_io_context;
 		const std::string                    m_server;         //!< if tcp, is set to server
 		const boost::uint16_t                m_port;
 		std::unique_ptr<MRedisTCPConnection> m_connection;
-
-		// Each client
 };
 
 }

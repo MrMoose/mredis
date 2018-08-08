@@ -76,8 +76,7 @@ void AsyncClient::hincrby(const std::string &n_hash_name, const std::string &n_f
 
 	m_connection->send_command(
 			[&](std::ostream &n_os) { format_hincrby(n_os, n_hash_name, n_field_name, n_increment_by); }
-	, std::move(n_callback));
-
+			, std::move(n_callback));
 }
 
 future_response AsyncClient::hincrby(const std::string &n_hash_name, const std::string &n_field_name, const boost::int64_t n_increment_by /*= 1*/) noexcept {
@@ -100,6 +99,34 @@ future_response AsyncClient::hincrby(const std::string &n_hash_name, const std::
 
 	return promise->get_future();
 }
+
+void AsyncClient::sadd(const std::string &n_set_name, const std::string &n_value, Callback &&n_callback) noexcept {
+
+	MOOSE_ASSERT(m_connection);
+
+	m_connection->send_command(
+			[&](std::ostream &n_os) { format_sadd(n_os, n_set_name, n_value); }
+			, std::move(n_callback));
+}
+
+future_response AsyncClient::sadd(const std::string &n_set_name, const std::string &n_value) noexcept {
+
+	promised_response_ptr promise(boost::make_shared<promised_response>());
+
+	m_connection->send_command(
+		[=](std::ostream &n_os) { format_sadd(n_os, n_set_name, n_value); },
+		[promise](const RESPonse &n_response) {
+
+			if (n_response.which() == 0) {
+				promise->set_exception(boost::get<redis_error>(n_response));
+			} else {
+				promise->set_value(n_response);
+			}
+	});
+
+	return promise->get_future();
+}
+
 
 }
 }
