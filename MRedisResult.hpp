@@ -31,6 +31,7 @@ typedef boost::make_recursive_variant<
 typedef std::function<void(const RESPonse &)> Callback;
 
 struct mrequest {
+
 	std::function<void(std::ostream &n_os)> m_prepare;
 	Callback                                m_callback;
 };

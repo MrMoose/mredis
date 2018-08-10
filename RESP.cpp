@@ -167,6 +167,18 @@ void format_hincrby(std::ostream &n_os, const std::string &n_hash_name, const st
 			" ", n_hash_name, n_field_name, n_incr_by);
 }
 
+void format_hget(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name) {
+
+	n_os << karma::format_delimited("HGET" << karma::string << karma::string << karma::no_delimit["\r\n"],
+			" ", n_hash_name, n_field_name);
+}
+
+void format_hset(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name, const std::string &n_value) {
+
+	n_os << karma::format_delimited("HSET" << karma::string << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
+			" ", n_hash_name, n_field_name, n_value);
+}
+
 void format_sadd(std::ostream &n_os, const std::string &n_set_name, const std::string &n_value) {
 
 	n_os << karma::format_delimited("SADD" << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],

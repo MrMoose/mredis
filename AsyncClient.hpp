@@ -67,7 +67,7 @@ class AsyncClient {
 		/*! @brief hash map field increment
 			@param n_hash_name assert on empty
 			@param n_field_name assumed to be an integer field
-			@param n_callback must be no-throw
+			@param n_callback must be no-throw, will not be executed in caller's thread
 			@see https://redis.io/commands/hincrby
 		 */
 		MREDIS_API void hincrby(const std::string &n_hash_name,
@@ -88,14 +88,44 @@ class AsyncClient {
 		/*! @brief hash map field get
 			@param n_hash_name assert on empty
 			@param n_field_name 
-			@param n_callback must be no-throw
-			@see https://redis.io/commands/hincrby
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/hget
 		*/
-		MREDIS_API void hmget(const std::string &n_hash_name,
+		MREDIS_API void hget(const std::string &n_hash_name,
 		                        const std::string &n_field_name,
-		                        const boost::int64_t n_increment_by,
+		                        Callback &&n_callback) noexcept;
+	
+		/*! @brief hash map field get
+			@param n_hash_name assert on empty
+			@param n_field_name
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/hget
+		 */
+		MREDIS_API future_response hget(const std::string &n_hash_name,
+			                    const std::string &n_field_name) noexcept;
+	
+		/*! @brief hash map field setter
+			@param n_hash_name assert on empty
+			@param n_field_name assert on empty
+			@param n_value whatever you want to set as value
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/hset
+		 */
+		MREDIS_API void hset(const std::string &n_hash_name,
+		                        const std::string &n_field_name,
+		                        const std::string &n_value,
 		                        Callback &&n_callback) noexcept;
 
+		/*! @brief hash map field setter
+			@param n_hash_name assert on empty
+			@param n_field_nameassert on empty
+			@param n_value whatever you want to set as value
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/hset
+		 */
+		MREDIS_API future_response hset(const std::string &n_hash_name,
+		                        const std::string &n_field_name,
+		                        const std::string &n_value) noexcept;
 		/*! @} */
 
 

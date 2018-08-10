@@ -204,7 +204,48 @@ void MRedisTCPConnection::stop() noexcept {
 	}
 }
 
-void MRedisTCPConnection::send_command(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept {
+void MRedisTCPConnection::send(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept {
+
+	{
+		// MOEP! Introduce lockfree queue!
+
+		
+		mrequest req{ std::move(n_prepare) , std::move(n_callback) };
+		boost::unique_lock<boost::mutex> slock(m_request_queue_lock);
+		m_requests_not_sent.emplace_back(std::move(req));
+	}
+
+	m_parent.m_io_context.post([this]() { this->send_outstanding_requests(); });
+}
+
+promised_response_ptr MRedisTCPConnection::send(std::function<void(std::ostream &n_os)> &&n_prepare) noexcept {
+
+	promised_response_ptr promise(boost::make_shared<promised_response>());
+
+	{
+		// MOEP! Introduce lockfree queue!
+		
+		mrequest req{ std::move(n_prepare),
+
+			[promise](const RESPonse &n_response) {
+
+				if (n_response.which() == 0) {
+					promise->set_exception(boost::get<redis_error>(n_response));
+				} else {
+					promise->set_value(n_response);
+				}
+			} };
+	
+		boost::unique_lock<boost::mutex> slock(m_request_queue_lock);
+		m_requests_not_sent.emplace_back(std::move(req));
+	}
+
+	m_parent.m_io_context.post([this]() { this->send_outstanding_requests(); });
+
+	return promise;
+}
+
+void MRedisTCPConnection::send_command_orig(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept {
 	
 	MOOSE_ASSERT_MSG(n_prepare, "stream preparation function must be given");
 
@@ -312,6 +353,9 @@ void MRedisTCPConnection::send_outstanding_requests() noexcept {
 			std::ostream os(&m_streambuf);
 
 			BOOST_LOG_SEV(logger(), debug) << "Sending " << m_requests_not_sent.size() << " outstanding requests";
+			
+			// MOEP! Please, lockfree! 
+			boost::unique_lock<boost::mutex> slock(m_request_queue_lock);
 
 			// See if we have unsent requests and stream them first in the order they came in
 			for (mrequest &req : m_requests_not_sent) {

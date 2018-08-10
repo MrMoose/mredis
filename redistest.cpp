@@ -127,6 +127,21 @@ int main(int argc, char **argv) {
 			output_result(fr12);
 			output_result(fr13);
 			output_result(fr14);
+
+			client.hset("myhash", "testfield", "moep");
+			client.hget("myhash", "testfield", [](const RESPonse &n_response) {
+			
+				// I expect the response to be a string containing a simple date time format
+				if (n_response.which() != 1) {
+					std::cerr << "not a string response: " << n_response.which();
+				} else {
+					std::cout << "Response: " << boost::get<std::string>(n_response) << std::endl;
+				}
+			});
+
+
+			boost::this_thread::sleep_for(boost::chrono::milliseconds(500));
+
 		}
 
 

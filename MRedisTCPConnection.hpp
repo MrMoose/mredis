@@ -9,6 +9,7 @@
 #include "RESP.hpp"
 
 #include <boost/asio.hpp>
+#include <boost/lockfree/queue.hpp>
 
 #include <functional>
 #include <string>
@@ -44,11 +45,21 @@ class MRedisTCPConnection {
 		/*! send an unknown command that can be filled by the caller via n_prepare
 			must be called from io_service thread
 		 */
-		void send_command(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept;
+		void send(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept;
 
-
+		/*! send an unknown command that can be filled by the caller via n_prepare
+			must be called from io_service thread
+		 */
+		promised_response_ptr send(std::function<void(std::ostream &n_os)> &&n_prepare) noexcept;
 
 	private:
+		/*! send an unknown command that can be filled by the caller via n_prepare
+			must be called from io_service thread
+
+			@note deprecated, i try to be queue only
+
+		 */
+		void send_command_orig(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept;
 
 		//! assume there are some and go send
 		void send_outstanding_requests() noexcept;
@@ -76,7 +87,10 @@ class MRedisTCPConnection {
 		boost::asio::streambuf       m_streambuf;           //!< use for reading packets and headers on upstream
 		boost::asio::steady_timer    m_send_retry_timer;    //!< when buffer is in use for sending, retry after a few micros
 		boost::asio::steady_timer    m_receive_retry_timer; //!< when buffer is in use for receiving, retry after a few micros
+		
+		boost::mutex                 m_request_queue_lock;
 		std::deque<mrequest>         m_requests_not_sent;
+
 		std::deque<Callback>         m_outstanding;
 
 		bool                         m_buffer_busy;        //!< streambuf in use
