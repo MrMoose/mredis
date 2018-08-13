@@ -83,15 +83,6 @@ int main(int argc, char **argv) {
 
 			client.connect();
 
-// 			client.hincrby("myhash", "field", 1, [](const RESPonse &n_response) {
-// 
-// 				if (n_response.which() == 2) {
-// 					std::cout << "Response: " << boost::get<boost::int64_t>(n_response) << std::endl;
-// 				} else {
-// 					std::cerr << "Unexpected response: " << n_response.which() << std::endl;
-// 				}
-// 			});
-
 			future_response fr1 = client.hincrby("myhash", "field", 1);
 			future_response fr2 = client.hincrby("myhash", "field", 1);
 			future_response fr3 = client.hincrby("myhash", "field", 1);
@@ -139,9 +130,20 @@ int main(int argc, char **argv) {
 				}
 			});
 
+			boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+			client.set("myval:437!:test_key", "This is my Test!");
+			
+			future_response sr1 = client.get("myval:437!:test_key");
 
-			boost::this_thread::sleep_for(boost::chrono::milliseconds(500));
-
+			RESPonse srr1 = sr1.get();
+				
+			// I expect the response to be a string containing a simple date time format
+			if (srr1.which() != 1) {
+				std::cerr << "not a string response: " << srr1.which() << std::endl;
+			} else {
+				std::cout << "Response string get: " << boost::get<std::string>(srr1) << std::endl;
+			}
+			
 		}
 
 

@@ -28,6 +28,14 @@ MREDIS_API bool parse(const std::string &n_input, RESPonse &n_response);
 //! write a ping into the stream
 MREDIS_API void format_ping(std::ostream &n_os);
 
+//! @return bulk string
+MREDIS_API void format_get(std::ostream &n_os, const std::string &n_key);
+
+//! @return integer
+MREDIS_API void format_set(std::ostream &n_os, const std::string &n_key, const std::string &n_value);
+
+//! @return integer
+MREDIS_API void format_incr(std::ostream &n_os, const std::string &n_key);
 
 //! @return integer
 MREDIS_API void format_hincrby(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name, const boost::int64_t n_incr_by);

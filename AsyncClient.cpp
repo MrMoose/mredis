@@ -69,6 +69,60 @@ boost::shared_future<bool> AsyncClient::async_connect() {
 	return promise->get_future();
 }
 
+void AsyncClient::get(const std::string &n_key, Callback &&n_callback) noexcept {
+
+	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(!n_key.empty());
+
+	m_connection->send(
+			[=](std::ostream &n_os) { format_get(n_os, n_key); }
+			, std::move(n_callback));
+}
+
+future_response AsyncClient::get(const std::string &n_key) noexcept {
+
+	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(!n_key.empty());
+
+	return m_connection->send([=](std::ostream &n_os) { format_get(n_os, n_key); })->get_future();
+}
+
+void AsyncClient::set(const std::string &n_key, const std::string &n_value, Callback &&n_callback) noexcept {
+	
+	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(!n_key.empty());
+
+	m_connection->send(
+			[=](std::ostream &n_os) { format_set(n_os, n_key, n_value); }
+			, std::move(n_callback));
+}
+
+future_response AsyncClient::set(const std::string &n_key, const std::string &n_value) noexcept {
+
+	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(!n_key.empty());
+
+	return m_connection->send([=](std::ostream &n_os) { format_set(n_os, n_key, n_value); })->get_future();
+}
+
+void AsyncClient::incr(const std::string &n_key, Callback &&n_callback) noexcept {
+	
+	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(!n_key.empty());
+
+	m_connection->send(
+			[=](std::ostream &n_os) { format_incr(n_os, n_key); }
+			, std::move(n_callback));
+}
+
+future_response AsyncClient::incr(const std::string &n_key) noexcept {
+
+	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(!n_key.empty());
+
+	return m_connection->send([=](std::ostream &n_os) { format_incr(n_os, n_key); })->get_future();
+}
+
 void AsyncClient::hincrby(const std::string &n_hash_name, const std::string &n_field_name,
 		const boost::int64_t n_increment_by, Callback &&n_callback /*= Callback()*/) noexcept {
 

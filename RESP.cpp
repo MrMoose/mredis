@@ -161,6 +161,34 @@ void format_ping(std::ostream &n_os) {
 	n_os << karma::format("PING\r\n");
 }
 
+void format_get(std::ostream &n_os, const std::string &n_key) {
+
+	n_os << karma::format_delimited("GET" << karma::string << karma::no_delimit["\r\n"], " ", n_key);
+}
+
+/*! @todo
+
+In order for set to be able to use binary data, use this:
+
+*3<crlf>
+$3<crlf>SET<crlf>
+${binary_key_length}<crlf>{binary_key_data}<crlf>
+${binary_data_length}<crlf>{binary_data}<crlf>
+
+
+*/
+
+void format_set(std::ostream &n_os, const std::string &n_key, const std::string &n_value) {
+
+	n_os << karma::format_delimited("SET" << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
+			" ", n_key, n_value);
+}
+
+void format_incr(std::ostream &n_os, const std::string &n_key) {
+	
+	n_os << karma::format_delimited("INCR" << karma::string << karma::no_delimit["\r\n"], " ", n_key);
+}
+
 void format_hincrby(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name, const boost::int64_t n_incr_by) {
 
 	n_os << karma::format_delimited("HINCRBY" << karma::string << karma::string << karma::long_long << karma::no_delimit["\r\n"],
