@@ -16,7 +16,8 @@ set(MREDIS_SRC
 	RESP.cpp
 	MRedisResult.cpp
 	MRedisError.cpp
-	MRedisTCPConnection.cpp
+	MRedisConnection.cpp
+	MRedisPubsubConnection.cpp
 	)
 
 set(MREDIS_HDR
@@ -26,7 +27,8 @@ set(MREDIS_HDR
 	RESP.hpp
 	MRedisResult.hpp
 	MRedisError.hpp
-	MRedisTCPConnection.hpp
+	MRedisConnection.hpp
+	MRedisPubsubConnection.hpp
 	)
 
 include_directories(
@@ -56,6 +58,13 @@ add_test(NAME TestRespParsers COMMAND TestRespParsers)
 
 add_executable(redistest redistest.cpp)
 target_link_libraries(redistest
+	mredis
+	moose_tools
+	${Boost_LIBRARIES}
+)
+
+add_executable(mt_testsuite mt_testsuite.cpp)
+target_link_libraries(mt_testsuite
 	mredis
 	moose_tools
 	${Boost_LIBRARIES}

@@ -49,6 +49,11 @@ MREDIS_API void format_hset(std::ostream &n_os, const std::string &n_hash_name, 
 //! @return integer
 MREDIS_API void format_sadd(std::ostream &n_os, const std::string &n_set_name, const std::string &n_value);
 
+
+MREDIS_API void format_subscribe(std::ostream &n_os, const std::string &n_channel_name);
+MREDIS_API void format_unsubscribe(std::ostream &n_os, const std::string &n_channel_name);
+MREDIS_API void format_publish(std::ostream &n_os, const std::string &n_channel_name, const std::string &n_message);
+
 /*! @} */
 
 

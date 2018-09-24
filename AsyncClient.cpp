@@ -4,12 +4,18 @@
 //  LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 #include "AsyncClient.hpp"
-#include "MRedisTCPConnection.hpp"
+#include "MRedisConnection.hpp"
+#include "MRedisPubsubConnection.hpp"
+#include "MRedisError.hpp"
 
 #include "tools/Assert.hpp"
+#include "tools/Error.hpp"
+#include "tools/Log.hpp"
 
 namespace moose {
 namespace mredis {
+
+using namespace moose::tools;
 
 AsyncClient::AsyncClient(boost::asio::io_context &n_io_context)
 		: m_io_context(n_io_context)
@@ -29,106 +35,131 @@ AsyncClient::AsyncClient(boost::asio::io_context &n_io_context, const std::strin
 
 AsyncClient::~AsyncClient() noexcept {
 
-	if (m_connection) {
-		m_connection->stop();
+	if (m_main_connection) {
+		m_main_connection->stop();
 		m_io_context.poll();
-		m_connection.reset();
+		m_main_connection.reset();
+	}
+
+	if (m_pubsub_connection) {
+		m_pubsub_connection->stop();
+		m_io_context.poll();
+		m_pubsub_connection.reset();
 	}
 }
 
 void AsyncClient::connect() {
 
-	if (m_connection) {
-		m_connection->stop();
+	if (m_main_connection) {
+		m_main_connection->stop();
 		m_io_context.poll();
-		m_connection.reset();
+		m_main_connection.reset();
 	}
 
-	MOOSE_ASSERT(!m_connection);
+	if (m_pubsub_connection) {
+		m_pubsub_connection->stop();
+		m_io_context.poll();
+		m_pubsub_connection.reset();
+	}
 
-	m_connection.reset(new MRedisTCPConnection(*this));
-	m_connection->connect(m_server, m_port);
+	MOOSE_ASSERT(!m_main_connection);
+	MOOSE_ASSERT(!m_pubsub_connection);
+
+	m_main_connection.reset(new MRedisConnection(*this));
+	m_main_connection->connect(m_server, m_port);
+
+	m_pubsub_connection.reset(new MRedisPubsubConnection(*this));
+	m_pubsub_connection->connect(m_server, m_port);
 }
 
 boost::shared_future<bool> AsyncClient::async_connect() {
 
-	if (m_connection) {
-		m_connection->stop();
+	if (m_main_connection) {
+		m_main_connection->stop();
 		m_io_context.poll();
-		m_connection.reset();
+		m_main_connection.reset();
 	}
 
-	MOOSE_ASSERT(!m_connection);
+	if (m_pubsub_connection) {
+		m_pubsub_connection->stop();
+		m_io_context.poll();
+		m_pubsub_connection.reset();
+	}
 
-	m_connection.reset(new MRedisTCPConnection(*this));
+	MOOSE_ASSERT(!m_main_connection);
+	MOOSE_ASSERT(!m_pubsub_connection);
 
+	m_main_connection.reset(new MRedisConnection(*this));
 	boost::shared_ptr<boost::promise<bool> > promise(boost::make_shared<boost::promise<bool> >());
-
-	m_connection->async_connect(m_server, m_port, promise);
+	m_main_connection->async_connect(m_server, m_port, promise);
+	
+	m_pubsub_connection.reset(new MRedisPubsubConnection(*this));
+	boost::shared_ptr<boost::promise<bool> > promise1(boost::make_shared<boost::promise<bool> >());
+	m_main_connection->async_connect(m_server, m_port, promise);
 
 	return promise->get_future();
 }
 
 void AsyncClient::get(const std::string &n_key, Callback &&n_callback) noexcept {
 
-	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(m_main_connection);
 	MOOSE_ASSERT(!n_key.empty());
 
-	m_connection->send(
+	m_main_connection->send(
 			[=](std::ostream &n_os) { format_get(n_os, n_key); }
 			, std::move(n_callback));
 }
 
 future_response AsyncClient::get(const std::string &n_key) noexcept {
 
-	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(m_main_connection);
 	MOOSE_ASSERT(!n_key.empty());
 
-	return m_connection->send([=](std::ostream &n_os) { format_get(n_os, n_key); })->get_future();
+	return m_main_connection->send([=](std::ostream &n_os) { format_get(n_os, n_key); })->get_future();
 }
 
 void AsyncClient::set(const std::string &n_key, const std::string &n_value, Callback &&n_callback) noexcept {
 	
-	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(m_main_connection);
 	MOOSE_ASSERT(!n_key.empty());
 
-	m_connection->send(
+	m_main_connection->send(
 			[=](std::ostream &n_os) { format_set(n_os, n_key, n_value); }
 			, std::move(n_callback));
 }
 
 future_response AsyncClient::set(const std::string &n_key, const std::string &n_value) noexcept {
 
-	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(m_main_connection);
 	MOOSE_ASSERT(!n_key.empty());
 
-	return m_connection->send([=](std::ostream &n_os) { format_set(n_os, n_key, n_value); })->get_future();
+	return m_main_connection->send([=](std::ostream &n_os) { format_set(n_os, n_key, n_value); })->get_future();
 }
 
 void AsyncClient::incr(const std::string &n_key, Callback &&n_callback) noexcept {
 	
-	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(m_main_connection);
 	MOOSE_ASSERT(!n_key.empty());
 
-	m_connection->send(
+	m_main_connection->send(
 			[=](std::ostream &n_os) { format_incr(n_os, n_key); }
 			, std::move(n_callback));
 }
 
 future_response AsyncClient::incr(const std::string &n_key) noexcept {
 
-	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(m_main_connection);
 	MOOSE_ASSERT(!n_key.empty());
 
-	return m_connection->send([=](std::ostream &n_os) { format_incr(n_os, n_key); })->get_future();
+	return m_main_connection->send([=](std::ostream &n_os) { format_incr(n_os, n_key); })->get_future();
 }
 
 void AsyncClient::hincrby(const std::string &n_hash_name, const std::string &n_field_name,
 		const boost::int64_t n_increment_by, Callback &&n_callback /*= Callback()*/) noexcept {
 
-	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(m_main_connection);
 
-	m_connection->send(
+	m_main_connection->send(
 			[=](std::ostream &n_os) { format_hincrby(n_os, n_hash_name, n_field_name, n_increment_by); }
 			, std::move(n_callback));
 }
@@ -139,58 +170,109 @@ future_response AsyncClient::hincrby(const std::string &n_hash_name, const std::
 	// only accepts copyable handlers. Meaning I have to use some kind of pointer type
 	// and unique_ptr also doesn't work. Making shared_ptr the only option
 
-	return m_connection->send([=](std::ostream &n_os) { format_hincrby(n_os, n_hash_name, n_field_name, n_increment_by); })->get_future();		
+	return m_main_connection->send([=](std::ostream &n_os) { format_hincrby(n_os, n_hash_name, n_field_name, n_increment_by); })->get_future();		
 }
 
 void AsyncClient::hget(const std::string &n_hash_name, const std::string &n_field_name, Callback &&n_callback) noexcept {
 
-	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(m_main_connection);
 
-	m_connection->send(
+	m_main_connection->send(
 			[=](std::ostream &n_os) { format_hget(n_os, n_hash_name, n_field_name); }
 			, std::move(n_callback));
 }
 
 future_response AsyncClient::hget(const std::string &n_hash_name, const std::string &n_field_name) noexcept {
 
-	return m_connection->send([=](std::ostream &n_os) { format_hget(n_os, n_hash_name, n_field_name); })->get_future();
+	return m_main_connection->send([=](std::ostream &n_os) { format_hget(n_os, n_hash_name, n_field_name); })->get_future();
 }
 
 void AsyncClient::hset(const std::string &n_hash_name, const std::string &n_field_name, const std::string &n_value, Callback &&n_callback) noexcept {
 	
-	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(m_main_connection);
 	MOOSE_ASSERT(!n_hash_name.empty());
 	MOOSE_ASSERT(!n_field_name.empty());
 
-	m_connection->send(
+	m_main_connection->send(
 			[=](std::ostream &n_os) { format_hset(n_os, n_hash_name, n_field_name, n_value); }
 			, std::move(n_callback));
 }
 
 future_response AsyncClient::hset(const std::string &n_hash_name, const std::string &n_field_name, const std::string &n_value) noexcept {
 
-	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(m_main_connection);
 	MOOSE_ASSERT(!n_hash_name.empty());
 	MOOSE_ASSERT(!n_field_name.empty());
 
-	return m_connection->send([=](std::ostream &n_os) { format_hset(n_os, n_hash_name, n_field_name, n_value); })->get_future();
+	return m_main_connection->send([=](std::ostream &n_os) { format_hset(n_os, n_hash_name, n_field_name, n_value); })->get_future();
 }
-
 
 void AsyncClient::sadd(const std::string &n_set_name, const std::string &n_value, Callback &&n_callback) noexcept {
 
-	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(m_main_connection);
 
-	m_connection->send(
+	m_main_connection->send(
 			[=](std::ostream &n_os) { format_sadd(n_os, n_set_name, n_value); }
 			, std::move(n_callback));
 }
 
 future_response AsyncClient::sadd(const std::string &n_set_name, const std::string &n_value) noexcept {
 
-	MOOSE_ASSERT(m_connection);
+	MOOSE_ASSERT(m_main_connection);
 
-	return m_connection->send([=](std::ostream &n_os) { format_sadd(n_os, n_set_name, n_value); })->get_future();
+	return m_main_connection->send([=](std::ostream &n_os) { format_sadd(n_os, n_set_name, n_value); })->get_future();
+}
+
+
+void AsyncClient::subscribe(const std::string &n_channel_name, MessageCallback &&n_callback) {
+
+	MOOSE_ASSERT(m_pubsub_connection);
+
+	// This will go async, so I have to wait for the return
+	boost::future<bool> retval = m_pubsub_connection->subscribe(n_channel_name, std::move(n_callback));
+
+	// This may throw. I'll pass the exception along
+	const bool ret = retval.get();
+
+	if (!ret) {
+		BOOST_THROW_EXCEPTION(redis_error()
+				<< error_message("Could not subscribe, please check logs for reason")
+				<< error_argument(n_channel_name));
+	} else {
+		BOOST_LOG_SEV(logger(), normal) << "Subscribed to channel '" << n_channel_name << "'";
+	}
+}
+
+void AsyncClient::unsubscribe(const std::string &n_channel_name) noexcept {
+
+	MOOSE_ASSERT(m_pubsub_connection);
+
+	try {
+		// This will go async, so I have to wait for the return
+		boost::future<bool> retval = m_pubsub_connection->unsubscribe(n_channel_name);
+
+		const bool ret = retval.get();
+
+		if (!ret) {
+			BOOST_LOG_SEV(logger(), warning) << "Could not unsubscribe '" << n_channel_name << "', please check logs for reason";
+		} else {
+			BOOST_LOG_SEV(logger(), normal) << "Unsubscribed from channel '" << n_channel_name << "'";
+		}
+	} catch (const tools::moose_error &merr) {
+		BOOST_LOG_SEV(logger(), warning) << "Exception unsubscribing '" << n_channel_name << "': "
+			<< boost::diagnostic_information(merr);
+	} catch (const std::exception &sex) {
+		BOOST_LOG_SEV(logger(), warning) << "Unexpected exception unsubscribing '" << n_channel_name << "': " << sex.what();
+	} catch (...) {
+		BOOST_LOG_SEV(logger(), warning) << "Unknown exception unsubscribing '" << n_channel_name << "'";
+	};
+}
+
+future_response AsyncClient::publish(const std::string &n_channel_name, const std::string &n_message) noexcept {
+	
+	MOOSE_ASSERT(m_main_connection);
+
+	return m_main_connection->send([=] (std::ostream &n_os) { format_publish(n_os, n_channel_name, n_message); })->get_future();
 }
 
 }

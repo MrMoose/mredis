@@ -28,7 +28,11 @@ typedef boost::make_recursive_variant<
 	std::vector<boost::recursive_variant_> // 4 arrays
 >::type RESPonse;
 
+//! callback for all kinds of responses
 typedef std::function<void(const RESPonse &)> Callback;
+
+//! the way I understand the protocol, payload to a message published is always a string
+typedef std::function<void(const std::string &)> MessageCallback;
 
 struct mrequest {
 

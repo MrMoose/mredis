@@ -213,6 +213,24 @@ void format_sadd(std::ostream &n_os, const std::string &n_set_name, const std::s
 			" ", n_set_name, n_value);
 }
 
+void format_subscribe(std::ostream &n_os, const std::string &n_channel_name) {
+	
+	n_os << karma::format_delimited("SUBSCRIBE" << karma::no_delimit[karma::string << "\r\n"],
+			" ", n_channel_name);
+}
+
+void format_unsubscribe(std::ostream &n_os, const std::string &n_channel_name) {
+
+	n_os << karma::format_delimited("UNSUBSCRIBE" << karma::no_delimit[karma::string << "\r\n"],
+			" ", n_channel_name);
+}
+
+void format_publish(std::ostream &n_os, const std::string &n_channel_name, const std::string &n_message) {
+
+	n_os << karma::format_delimited("PUBLISH" << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
+			" ", n_channel_name, n_message);
+}
+
 RESPonse parse_one(std::istream &n_is) {
 	
 	typedef std::istreambuf_iterator<char> base_iterator_type;

@@ -7,6 +7,8 @@
 #include "MRedisConfig.hpp"
 #include "MRedisResult.hpp"
 
+#include "tools/Macros.hpp"
+
 #include <boost/thread/mutex.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/asio/io_context.hpp>
@@ -14,12 +16,14 @@
 namespace moose {
 namespace mredis {
 
-class MRedisTCPConnection;
+MOOSE_FWD_DECLARE_CLASS(MRedisConnection);
+MOOSE_FWD_DECLARE_CLASS(MRedisPubsubConnection);
 
 /*! @brief simple async Redis client.
 	And yes, I know. Classes that are described as "simple" generally turn out 
 	not at all simple or broken or both. But I have no choice. None of the available 
-	redis client libs are suitable for this.
+	redis client libs are suitable for this. Let's call it 'incomplete' instead 
+	because I only add commands as I need them
 
 	@note This is meant to use an io_context that is already run elsewhere.
 		It relies on the fact that this actually is run. Also, it does not support 
@@ -182,7 +186,7 @@ class AsyncClient {
 		/*! @brief set add
 			@param n_set_name the name of your set
 			@param n_value what to insert
-			@param n_callback must be no-throw
+			@param n_callback must be no-throw, will not be executed in caller's thread
 			@see https://redis.io/commands/sadd
 		*/
 		MREDIS_API void sadd(const std::string &n_set_name,
@@ -201,14 +205,55 @@ class AsyncClient {
 
 		/*! @} */
 
+		/*! @defgroup pub/sub functions
+			Subcribe to channels and publish messages upon them
+			@{
+		*/
+
+		/*! @brief subscribe to that channel and issue callback when message comes in
+			If already subscribed, handler will be replaced
+			@param n_channel_name the name of the channel you wish to subscribe to
+			@param n_callback will be called, not in caller's thread, when message for 
+				that channel comes in. This is being kept alive until unsubscribe from that channel
+
+			@note this is a synchronous call. It will block until the subscription is done,
+				which may include establishing a connection
+
+			@throw network_error or redis_error in case connection could not be established or command failed
+
+			@see https://redis.io/topics/pubsub
+		*/
+		MREDIS_API void subscribe(const std::string &n_channel_name, MessageCallback &&n_callback);
+		
+		/*! @brief unsubscribe from that channel, delete callback handler
+			@param n_channel_name the name of the channel you wish to unsubscribe from
+			
+			@throw network_error or redis_error in case connection could not be established or command failed
+
+			@see https://redis.io/topics/pubsub
+		*/
+		MREDIS_API void unsubscribe(const std::string &n_channel_name) noexcept;
+
+		/*! @brief send a message to a channel and to all subscribers
+			@param n_channel_name the name of the channel you would like to send your message to
+			@param n_message message to send
+			@return future int that tells how many subscribers have received the message
+			@see https://redis.io/commands/publish
+		*/
+		MREDIS_API future_response publish(const std::string &n_channel_name, const std::string &n_message) noexcept;
+
+		/*! @} */
+
 	private:
 
-		friend class MRedisTCPConnection;
+		friend class MRedisConnection;
+		friend class MRedisPubsubConnection;
 
-		boost::asio::io_context             &m_io_context;
-		const std::string                    m_server;         //!< if tcp, is set to server
-		const boost::uint16_t                m_port;
-		std::unique_ptr<MRedisTCPConnection> m_connection;
+		boost::asio::io_context   &m_io_context;
+		const std::string          m_server;            //!< server hostname if TCP
+		const boost::uint16_t      m_port;              //!< server port
+		MRedisConnectionUPtr       m_main_connection;   //!< this connection handles every major command
+		MRedisPubsubConnectionUPtr m_pubsub_connection; //!< connection specific for pubsub messages
 };
 
 }

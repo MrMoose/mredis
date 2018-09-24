@@ -3,7 +3,7 @@
 //  Software License, Version 1.0. (See accompanying file
 //  LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include "MRedisTCPConnection.hpp"
+#include "MRedisConnection.hpp"
 #include "AsyncClient.hpp"
 #include "RESP.hpp"
 
@@ -21,7 +21,7 @@ using namespace moose::tools;
 namespace asio = boost::asio;
 namespace ip = asio::ip;
 
-MRedisTCPConnection::MRedisTCPConnection(AsyncClient &n_parent)
+MRedisConnection::MRedisConnection(AsyncClient &n_parent)
 		: m_parent(n_parent)
 		, m_socket(n_parent.m_io_context)
 		, m_send_retry_timer(n_parent.m_io_context)
@@ -31,11 +31,11 @@ MRedisTCPConnection::MRedisTCPConnection(AsyncClient &n_parent)
 
 }
 
-MRedisTCPConnection::~MRedisTCPConnection() noexcept {
+MRedisConnection::~MRedisConnection() noexcept {
 
 }
 
-void MRedisTCPConnection::connect(const std::string &n_server, const boost::uint16_t n_port) {
+void MRedisConnection::connect(const std::string &n_server, const boost::uint16_t n_port) {
 
 	BOOST_LOG_FUNCTION();
 	BOOST_LOG_SEV(logger(), debug) << "Connecting to TCP redis server on " << n_server << ":" << n_port;
@@ -111,7 +111,7 @@ void MRedisTCPConnection::connect(const std::string &n_server, const boost::uint
 	return;
 }
 
-void MRedisTCPConnection::async_connect(const std::string &n_server, const boost::uint16_t n_port, boost::shared_ptr<boost::promise<bool> > n_ret) {
+void MRedisConnection::async_connect(const std::string &n_server, const boost::uint16_t n_port, boost::shared_ptr<boost::promise<bool> > n_ret) {
 	
 	BOOST_LOG_FUNCTION();
 	BOOST_LOG_SEV(logger(), debug) << "Async connecting to TCP redis server on " << n_server << ":" << n_port;
@@ -182,7 +182,7 @@ void MRedisTCPConnection::async_connect(const std::string &n_server, const boost
 	return;
 }
 
-void MRedisTCPConnection::stop() noexcept {
+void MRedisConnection::stop() noexcept {
 
 	BOOST_LOG_FUNCTION();
 	BOOST_LOG_SEV(logger(), normal) << "MRedis TCP connection shutting down";
@@ -204,7 +204,7 @@ void MRedisTCPConnection::stop() noexcept {
 	}
 }
 
-void MRedisTCPConnection::send(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept {
+void MRedisConnection::send(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept {
 
 	{
 		// MOEP! Introduce lockfree queue!
@@ -218,7 +218,7 @@ void MRedisTCPConnection::send(std::function<void(std::ostream &n_os)> &&n_prepa
 	m_parent.m_io_context.post([this]() { this->send_outstanding_requests(); });
 }
 
-promised_response_ptr MRedisTCPConnection::send(std::function<void(std::ostream &n_os)> &&n_prepare) noexcept {
+promised_response_ptr MRedisConnection::send(std::function<void(std::ostream &n_os)> &&n_prepare) noexcept {
 
 	promised_response_ptr promise(boost::make_shared<promised_response>());
 
@@ -245,7 +245,7 @@ promised_response_ptr MRedisTCPConnection::send(std::function<void(std::ostream 
 	return promise;
 }
 
-void MRedisTCPConnection::send_command_orig(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept {
+void MRedisConnection::send_command_orig(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept {
 	
 	MOOSE_ASSERT_MSG(n_prepare, "stream preparation function must be given");
 
@@ -327,7 +327,7 @@ void MRedisTCPConnection::send_command_orig(std::function<void(std::ostream &n_o
 }
 
 
-void MRedisTCPConnection::send_outstanding_requests() noexcept {
+void MRedisConnection::send_outstanding_requests() noexcept {
 
 	try {
 		// if the streambuf is still in use we have to wait
@@ -352,7 +352,7 @@ void MRedisTCPConnection::send_outstanding_requests() noexcept {
 		{
 			std::ostream os(&m_streambuf);
 
-			BOOST_LOG_SEV(logger(), debug) << "Sending " << m_requests_not_sent.size() << " outstanding requests";
+//			BOOST_LOG_SEV(logger(), debug) << "Sending " << m_requests_not_sent.size() << " outstanding requests";
 			
 			// MOEP! Please, lockfree! 
 			boost::unique_lock<boost::mutex> slock(m_request_queue_lock);
@@ -395,7 +395,7 @@ void MRedisTCPConnection::send_outstanding_requests() noexcept {
 	}
 }
 
-void MRedisTCPConnection::read_response() noexcept {
+void MRedisConnection::read_response() noexcept {
 
 	if (m_status >= Status::ShuttingDown) {
 		return;
@@ -448,7 +448,7 @@ void MRedisTCPConnection::read_response() noexcept {
 		}
 
 		// Otherwise read more from the socket
-		BOOST_LOG_SEV(logger(), debug) << "Reading more response";
+//		BOOST_LOG_SEV(logger(), debug) << "Reading more response";
 
 		// read one response and evaluate
 		asio::async_read(m_socket, m_streambuf, asio::transfer_at_least(1),
@@ -483,7 +483,7 @@ void MRedisTCPConnection::read_response() noexcept {
 }
 
 
-bool MRedisTCPConnection::handle_error(const boost::system::error_code n_errc, const char *n_message) const {
+bool MRedisConnection::handle_error(const boost::system::error_code n_errc, const char *n_message) const {
 
 	if (!n_errc) {
 		return false;
