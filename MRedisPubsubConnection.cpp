@@ -92,7 +92,7 @@ boost::future<bool> MRedisPubsubConnection::subscribe(const std::string &n_chann
 	m_pending_subscriptions.push(new pending_subscription{ n_channel_name, 0, promised_retval });
 	m_subscriptions_pending++;
 
-	m_parent.m_io_context.post([this] () {
+	m_socket.get_io_context().post([this] () {
 
 		this->finish_subscriptions();
 	});
@@ -147,23 +147,6 @@ void MRedisPubsubConnection::finish_subscriptions() {
 	try {
 		// if the streambuf is still in use so we have to wait for it to become available.
 		if (m_buffer_busy) {
-
-			// it is very likely an async operation is listening on the socket waiting 
-			// for messages. In order to safely do so, the buffer is marked busy. I would have 
-			// to wait for the next message in order to make this happen, which is not sensible.
-			// 
-			// Right now I see no other way but to shut down the async operation while keeping 
-			// the socket alive. 
-			//
-			if (m_status == Status::Pubsub && (m_subscriptions_pending.load() == 1)) {
-				boost::system::error_code err;
-				BOOST_LOG_SEV(logger(), normal) << "Cancel read operation on socket";
-				m_socket.cancel(err);      // This should immediately cancel the message read
-				if (err) {
-					BOOST_LOG_SEV(logger(), warning) << "Could not cancel socket operation trying to subscribe/unsubscribe: " << err.message();
-				}
-			}
-
 			m_send_retry_timer.expires_after(asio::chrono::milliseconds(1));
 			m_send_retry_timer.async_wait(
 				[this] (const boost::system::error_code &n_err) {
@@ -177,9 +160,8 @@ void MRedisPubsubConnection::finish_subscriptions() {
 
 		const bool subscribe_available = m_pending_subscriptions.pop(sub);
 		if (!subscribe_available) {				
-			BOOST_LOG_SEV(logger(), warning) << "No outstanding subscriptions available";
-			// This should not happen as we only always call this after we filled the q
-			// or after we waited for the buffer to clear. So I don't go into retry but
+			BOOST_LOG_SEV(logger(), normal) << "No outstanding subscriptions available";
+			// This can happen when we receive a wakeup call someone else sent
 			return;
 		}
 
@@ -191,10 +173,8 @@ void MRedisPubsubConnection::finish_subscriptions() {
 		{
 			std::ostream os(&m_streambuf);
 			if (sub->get<1>() != 0) {
-				BOOST_LOG_SEV(logger(), normal) << "Writing unsubscribe for " << sub->get<0>();
 				format_unsubscribe(os, sub->get<0>());
 			} else {
-				BOOST_LOG_SEV(logger(), normal) << "Writing subscribe for " << sub->get<0>();
 				format_subscribe(os, sub->get<0>());
 			}
 		}
@@ -235,7 +215,6 @@ void MRedisPubsubConnection::finish_subscriptions() {
 				// Keep the promise alive while waiting for confirmation.
 				// I hand the raw ptr over to this map and wrap it into a unique_ptr 
 				// because this map need not be thread safe.
-
 				m_pending_confirms.push_back(*sub);
 				delete sub;
 
@@ -356,27 +335,32 @@ class MessageVisitor : public boost::static_visitor<> {
 			// We know the message channel now
 			const std::string &channel = boost::get<std::string>(n_array[1]);
 
-			// Find the appropriate handler(s) and call
-			boost::unique_lock<boost::mutex> slock(m_parent.m_message_handlers_lock);
-
-			std::map<std::string, MRedisPubsubConnection::SubscriptionMap>::iterator i = m_parent.m_message_handlers.find(channel);
-			if (i == m_parent.m_message_handlers.end()) {
-				BOOST_LOG_SEV(logger(), error) << "No subscribed handler for channel '" << channel
-					<< "'. This is a bug. We should not be getting this message.";
-				return;
+			// This was a wakeup call to enable us to interrupt message read in order to send subscriptions
+			if (boost::algorithm::equals(channel, "MREDIS_WAKEUP")) {
+				BOOST_LOG_SEV(logger(), normal) << "Wakeup call received. See to subscriptions";
 			} else {
-				try {
+				// Find the appropriate handler(s) and call
+				boost::unique_lock<boost::mutex> slock(m_parent.m_message_handlers_lock);
 
-					for (MRedisPubsubConnection::SubscriptionMap::value_type &sub : i->second) {
-						sub.second(boost::get<std::string>(n_array[2]));
+				std::map<std::string, MRedisPubsubConnection::SubscriptionMap>::iterator i = m_parent.m_message_handlers.find(channel);
+				if (i == m_parent.m_message_handlers.end()) {
+					BOOST_LOG_SEV(logger(), error) << "No subscribed handler for channel '" << channel
+							<< "'. This is a bug. We should not be getting this message.";
+					return;
+				} else {
+					try {
+
+						for (MRedisPubsubConnection::SubscriptionMap::value_type &sub : i->second) {
+							sub.second(boost::get<std::string>(n_array[2]));
+						}
+
+					} catch (const std::exception &sex) {
+						BOOST_LOG_SEV(logger(), error) << "Subscribed (no-throw) handler for channel '" << channel
+							<< "' threw an exception: " << sex.what();
+					} catch (...) {
+						BOOST_LOG_SEV(logger(), error) << "Subscribed (no-throw) handler for channel '" << channel
+							<< "' threw an unknown exception";
 					}
-
-				} catch (const std::exception &sex) {
-					BOOST_LOG_SEV(logger(), error) << "Subscribed (no-throw) handler for channel '" << channel
-						<< "' threw an exception: " << sex.what();
-				} catch (...) {
-					BOOST_LOG_SEV(logger(), error) << "Subscribed (no-throw) handler for channel '" << channel
-						<< "' threw an unknown exception";
 				}
 			}
 
@@ -390,11 +374,16 @@ class MessageVisitor : public boost::static_visitor<> {
 			// Our subscribe was successful.
 			const std::string &channel = boost::get<std::string>(n_array[1]);
 
+			if (boost::algorithm::equals(channel, "MREDIS_WAKEUP")) {
+				// internal wakeup call
+				return;
+			}
+
 			// Find a subscription for that channel in our confirms vector
 			std::vector<MRedisPubsubConnection::pending_subscription>::iterator i = std::find_if(
 				m_parent.m_pending_confirms.begin(), m_parent.m_pending_confirms.end(),
 				[&] (const MRedisPubsubConnection::pending_subscription &p) -> bool {
-					return (boost::algorithm::equals(p.get<0>(), channel) && p.get<1>());
+					return (boost::algorithm::equals(p.get<0>(), channel) && !p.get<1>());
 			});
 
 			if (i == m_parent.m_pending_confirms.end()) {
@@ -404,15 +393,6 @@ class MessageVisitor : public boost::static_visitor<> {
 
 			// This will notify the original caller that we now are subscribed
 			i->get<2>()->set_value(true);
-
-			// We should be subscribed to as many channels now.
-			// Let's be harsh during development and assert this shit
-			{
-				// Let's take care of the handler first and put it in our map
-				boost::unique_lock<boost::mutex> slock(m_parent.m_message_handlers_lock);
-				MOOSE_ASSERT(boost::get<boost::int64_t>(n_array[2]) == m_parent.m_message_handlers.size());
-			}
-
 			delete i->get<2>();
 			m_parent.m_pending_confirms.erase(i);
 
@@ -423,37 +403,37 @@ class MessageVisitor : public boost::static_visitor<> {
 				return;
 			}
 
-			// Our subscribe was successful.
 			const std::string &channel = boost::get<std::string>(n_array[1]);
 
 			// Find a unsubscription for that channel in our confirms vector
 			std::vector<MRedisPubsubConnection::pending_subscription>::iterator i = std::find_if(
 				m_parent.m_pending_confirms.begin(), m_parent.m_pending_confirms.end(),
 				[&] (const MRedisPubsubConnection::pending_subscription &p) -> bool {
-					return (boost::algorithm::equals(p.get<0>(), channel) && !p.get<1>());
+					return (boost::algorithm::equals(p.get<0>(), channel) && p.get<1>());
 			});
 
 
 			if (i == m_parent.m_pending_confirms.end()) {
 				BOOST_LOG_SEV(logger(), warning) << "Got an unexpected unsubscribe confirmation for channel '" << channel << "'";
-
 				// This is not so bad here. We may be unsubscribing from everything and get confirmations anyway
 			} else {
-				// This will notify the original caller that we now are subscribed
+				const boost::uint64_t id = i->get<1>();
+
 				m_parent.m_pending_confirms.erase(i);
+				BOOST_LOG_SEV(logger(), normal) << "Unsubscribed from channel '" << channel;
+
+				// Finally remove our handler
+				boost::unique_lock<boost::mutex> slock(m_parent.m_message_handlers_lock);			
+				m_parent.m_message_handlers[channel].erase(id);
+				if (m_parent.m_message_handlers[channel].empty()) {
+					m_parent.m_message_handlers.erase(channel);
+				}
+
+				if (m_parent.m_message_handlers.empty()) {
+					BOOST_LOG_SEV(logger(), normal) << "Last subscription removed, leaving pubsub mode";
+					m_parent.m_status = MRedisConnection::Status::Pushing;
+				}
 			}
-
-			// Finally remove our handler
-			boost::unique_lock<boost::mutex> slock(m_parent.m_message_handlers_lock);
-			m_parent.m_message_handlers.erase(channel);
-
-			MOOSE_ASSERT(boost::get<boost::int64_t>(n_array[2]) == m_parent.m_message_handlers.size());
-
-			if (m_parent.m_message_handlers.empty()) {
-				BOOST_LOG_SEV(logger(), normal) << "Last subscription removed, leaving pubsub mode";
-				m_parent.m_status = MRedisConnection::Status::Pushing;
-			}
-
 		} else {
 			BOOST_LOG_SEV(logger(), error) << "Unknown message type: " << n_array[0].which();
 			return;
@@ -505,27 +485,30 @@ void MRedisPubsubConnection::read_message() {
 			}
 		}
 
+		// We may have been woken up by a message, only to be able to see if we 
+		// got outstanding subscriptions
+		if (m_subscriptions_pending.load() > 0) {
+			m_buffer_busy = false;
+			m_socket.get_io_context().post([this] () {
+				this->finish_subscriptions();
+			});
+			return;
+		}
+
 		// handle_message may have caused us to leave pubsub mode by removing the last subscription
 		if (m_status != Status::Pubsub) {
+			m_buffer_busy = false;
 			return;
 		}
 
 		// Otherwise read more from the socket
-		BOOST_LOG_SEV(logger(), debug) << "Reading more messages";
+	//	BOOST_LOG_SEV(logger(), debug) << "Reading more messages";
 
 		// read one messages and evaluate
 		asio::async_read(m_socket, m_streambuf, asio::transfer_at_least(1),
 			[this] (const boost::system::error_code n_errc, const std::size_t) {
 
 				m_buffer_busy = false;
-
-				// This is a special case. We continuously read messages. When we get a new subscription
-				// request though we must interrupt this, which causes this handler to abort
-				if ((n_errc == boost::asio::error::operation_aborted) && (m_subscriptions_pending.load() > 0)) {
-					BOOST_LOG_SEV(logger(), normal) << "Message read operation aborted, assuming subscribe request incoming";
-					this->finish_subscriptions();
-					return;
-				}
 
 				if (handle_error(n_errc, "reading message")) {
 					stop();
@@ -536,17 +519,19 @@ void MRedisPubsubConnection::read_message() {
 					BOOST_LOG_SEV(logger(), normal) << "Shutting down, not reading any more messages";
 					return;
 				}
+				
+				read_message();
 
-				if (m_status != MRedisConnection::Status::Pubsub) {
-					read_message();
-				} else {
-					// this is going to parse
-					if (m_subscriptions_pending.load() > 0) {
-						this->finish_subscriptions();
-					} else {
-						read_message();
-					}
-				}
+// 				if (m_status != MRedisConnection::Status::Pubsub) {
+// 					read_message();
+// 				} else {
+// 					// this is going to parse
+// 					if (m_subscriptions_pending.load() > 0) {
+// 						this->finish_subscriptions();
+// 					} else {
+// 						read_message();
+// 					}
+// 				}
 		});
 	} catch (const boost::system::system_error &serr) {
 		// Very likely we failed to set a retry timer. Doesn't matter. We still wake up as the next command comes in

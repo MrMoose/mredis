@@ -240,6 +240,8 @@ int main(int argc, char **argv) {
 				std::cerr << "All subscribers should have the same end result" << std::endl;
 			}
 
+			std::cout << "Subscriber 1 at " << easy_subscriber_1.m_last << std::endl;
+
 // 			easy_subscriber_3.stop();
 			testers.join_all();
 

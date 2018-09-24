@@ -215,7 +215,7 @@ void format_sadd(std::ostream &n_os, const std::string &n_set_name, const std::s
 
 void format_subscribe(std::ostream &n_os, const std::string &n_channel_name) {
 	
-	n_os << karma::format_delimited("SUBSCRIBE" << karma::no_delimit[karma::string << "\r\n"],
+	n_os << karma::format_delimited("SUBSCRIBE MREDIS_WAKEUP" << karma::no_delimit[karma::string << "\r\n"],
 			" ", n_channel_name);
 }
 
