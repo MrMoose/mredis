@@ -58,7 +58,7 @@ class EasySubscriberThread {
 
 				while (!m_stopped) {
 
-					m_redis.subscribe("easy_int_test", [this] (const std::string &n_message) {
+					m_subscription = m_redis.subscribe("easy_int_test", [this] (const std::string &n_message) {
 
 						boost::int64_t current = boost::lexical_cast<boost::int64_t>(n_message);
 
@@ -72,7 +72,7 @@ class EasySubscriberThread {
 					// sleep for a random number of seconds, while subscriptions lasts
 					boost::this_thread::sleep_for(boost::chrono::seconds(urand(5) + 1));
 
-					m_redis.unsubscribe("easy_int_test");
+					m_redis.unsubscribe(m_subscription);
 				}
 			} catch (const moose_error &merr) {
 				std::cerr << "Exception caught by EasySubscriberThread: " << boost::diagnostic_information(merr) << std::endl;
@@ -81,10 +81,11 @@ class EasySubscriberThread {
 		}
 
 		boost::atomic<bool>  m_error = false;    //!< once any error indication is met, this turns true
+		boost::int64_t       m_last = 0;
 
 	private:
-		boost::atomic<bool>  m_stopped = false;
-		boost::int64_t       m_last = 0;
+		boost::uint64_t      m_subscription = 0;
+		boost::atomic<bool>  m_stopped = false;		
 		AsyncClient         &m_redis;
 };
 
@@ -233,6 +234,10 @@ int main(int argc, char **argv) {
 			easy_subscriber_2.stop();
 			if (easy_subscriber_2.m_error) {
 				std::cerr << "Error condition in subscriber 2" << std::endl;
+			}
+
+			if (easy_subscriber_1.m_last != easy_subscriber_2.m_last) {
+				std::cerr << "All subscribers should have the same end result" << std::endl;
 			}
 
 // 			easy_subscriber_3.stop();

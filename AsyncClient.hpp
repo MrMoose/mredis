@@ -219,20 +219,22 @@ class AsyncClient {
 			@note this is a synchronous call. It will block until the subscription is done,
 				which may include establishing a connection
 
+			@return a subscription ID for that handler. Use this to unsubscribe if needed
+
 			@throw network_error or redis_error in case connection could not be established or command failed
 
 			@see https://redis.io/topics/pubsub
 		*/
-		MREDIS_API void subscribe(const std::string &n_channel_name, MessageCallback &&n_callback);
+		MREDIS_API boost::uint64_t subscribe(const std::string &n_channel_name, MessageCallback &&n_callback);
 		
 		/*! @brief unsubscribe from that channel, delete callback handler
-			@param n_channel_name the name of the channel you wish to unsubscribe from
+			@param n_subscription the ID resulting from the call to subscribe()
 			
 			@throw network_error or redis_error in case connection could not be established or command failed
 
 			@see https://redis.io/topics/pubsub
 		*/
-		MREDIS_API void unsubscribe(const std::string &n_channel_name) noexcept;
+		MREDIS_API void unsubscribe(const boost::uint64_t n_subscription) noexcept;
 
 		/*! @brief send a message to a channel and to all subscribers
 			@param n_channel_name the name of the channel you would like to send your message to

@@ -224,12 +224,14 @@ future_response AsyncClient::sadd(const std::string &n_set_name, const std::stri
 }
 
 
-void AsyncClient::subscribe(const std::string &n_channel_name, MessageCallback &&n_callback) {
+boost::uint64_t AsyncClient::subscribe(const std::string &n_channel_name, MessageCallback &&n_callback) {
 
 	MOOSE_ASSERT(m_pubsub_connection);
 
+	boost::uint64_t id = 0;
+
 	// This will go async, so I have to wait for the return
-	boost::future<bool> retval = m_pubsub_connection->subscribe(n_channel_name, std::move(n_callback));
+	boost::future<bool> retval = m_pubsub_connection->subscribe(n_channel_name, &id, std::move(n_callback));
 
 	// This may throw. I'll pass the exception along
 	const bool ret = retval.get();
@@ -239,32 +241,25 @@ void AsyncClient::subscribe(const std::string &n_channel_name, MessageCallback &
 				<< error_message("Could not subscribe, please check logs for reason")
 				<< error_argument(n_channel_name));
 	} else {
-		BOOST_LOG_SEV(logger(), normal) << "Subscribed to channel '" << n_channel_name << "'";
+		BOOST_LOG_SEV(logger(), normal) << "Subscribed to channel '" << n_channel_name << "' with id " << id;
+		return id;
 	}
 }
 
-void AsyncClient::unsubscribe(const std::string &n_channel_name) noexcept {
+void AsyncClient::unsubscribe(const boost::uint64_t n_subscription) noexcept {
 
 	MOOSE_ASSERT(m_pubsub_connection);
 
 	try {
-		// This will go async, so I have to wait for the return
-		boost::future<bool> retval = m_pubsub_connection->unsubscribe(n_channel_name);
+		m_pubsub_connection->unsubscribe(n_subscription);
 
-		const bool ret = retval.get();
-
-		if (!ret) {
-			BOOST_LOG_SEV(logger(), warning) << "Could not unsubscribe '" << n_channel_name << "', please check logs for reason";
-		} else {
-			BOOST_LOG_SEV(logger(), normal) << "Unsubscribed from channel '" << n_channel_name << "'";
-		}
 	} catch (const tools::moose_error &merr) {
-		BOOST_LOG_SEV(logger(), warning) << "Exception unsubscribing '" << n_channel_name << "': "
+		BOOST_LOG_SEV(logger(), warning) << "Exception unsubscribing '" << n_subscription << "': "
 			<< boost::diagnostic_information(merr);
 	} catch (const std::exception &sex) {
-		BOOST_LOG_SEV(logger(), warning) << "Unexpected exception unsubscribing '" << n_channel_name << "': " << sex.what();
+		BOOST_LOG_SEV(logger(), warning) << "Unexpected exception unsubscribing '" << n_subscription << "': " << sex.what();
 	} catch (...) {
-		BOOST_LOG_SEV(logger(), warning) << "Unknown exception unsubscribing '" << n_channel_name << "'";
+		BOOST_LOG_SEV(logger(), warning) << "Unknown exception unsubscribing '" << n_subscription << "'";
 	};
 }
 

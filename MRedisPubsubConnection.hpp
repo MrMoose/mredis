@@ -31,12 +31,13 @@ class MRedisPubsubConnection : public MRedisConnection {
 		virtual void stop() noexcept;
 		
 		//! schedule subscription. Promise will be set true when done
+		//! @param n_id will be set when subscription returned true
 		//! @throw exception state may be set on future
-		boost::future<bool> subscribe(const std::string &n_channel_name, MessageCallback &&n_callback);
+		boost::future<bool> subscribe(const std::string &n_channel_name, boost::uint64_t *n_id, MessageCallback &&n_callback);
 
-		//! schedule unsubscribe. Promise will be set true when done
+		//! schedule unsubscribe.
 		//! @throw exception state may be set on future
-		boost::future<bool> unsubscribe(const std::string &n_channel_name);
+		void unsubscribe(const boost::uint64_t n_id);
 
 	private:
 		friend class MessageVisitor;
@@ -49,17 +50,21 @@ class MRedisPubsubConnection : public MRedisConnection {
 		//! while in pubsub mode, we are permanently sucking for messages
 		void read_message();
 
-		//! when a message came in, analyze and treat by consuming
-		void handle_message(const RESPonse &&n_message) noexcept;
-
 		//! For pubsub mode, instead of having one-shot handlers,
 		//! I keep them until unsubscribe
 
-		std::map<std::string, MessageCallback>                         m_message_handlers;
-		boost::mutex                                                   m_message_handlers_lock;
+		//! Subscription ID to handler. We can have many handlers for one channel.
+		typedef std::map<boost::uint64_t, MessageCallback> SubscriptionMap;
+
+		std::map<std::string, SubscriptionMap>      m_message_handlers;
+		boost::mutex                                m_message_handlers_lock;
 
 		//! A list of channel names we still have to subscribe to and promises that shall be broken
-		typedef boost::tuple<std::string, boost::promise<bool> *> pending_subscription;
+		typedef boost::tuple<
+				  std::string             // channel name
+				, boost::uint64_t         // 0 when subscribe, set to a subscription ID when unsubscribe
+				, boost::promise<bool> *  // have ownership, respond when ready, only set for subscriptions
+		> pending_subscription;
 		
 		//! requests for subscriptions in here
 		boost::lockfree::queue<pending_subscription *>                 m_pending_subscriptions;
@@ -67,17 +72,9 @@ class MRedisPubsubConnection : public MRedisConnection {
 		//! this signifies that subscriptions are pending
 		boost::atomic<unsigned int>                                    m_subscriptions_pending;
 
-		//! same data type goes for unsubscribes too
-		boost::lockfree::queue<pending_subscription *>                 m_pending_unsubscribes;
-
-		//! this signifies that unsubscribes are pending
-		boost::atomic<unsigned int>                                    m_unsubscribes_pending;
-
-		//! after subscribe request is sent, we keep the promised response until confirm
+		//! after they were sent, I move the subscription tuple into this vector to await confirmation
 		//! this doesn't need to be locked or lockfree as access should only occur from io_srv threads
-		typedef std::map<std::string, boost::promise<bool> *> confirmation_map;
-		confirmation_map                                               m_pending_subscribe_confirms;
-		confirmation_map                                               m_pending_unsubscribe_confirms;
+		std::vector<pending_subscription>                              m_pending_confirms;
 };
 
 }
