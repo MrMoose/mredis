@@ -97,6 +97,14 @@ boost::future<bool> MRedisPubsubConnection::subscribe(const std::string &n_chann
 		this->finish_subscriptions();
 	});
 
+	if (m_status == Status::Pubsub) {
+		// Our connection may be waiting for messages already and not receive any.
+		// In order for the io_service to become available, I send a dummy wakeup call 
+		// to ourselves. This is channel MREDIS_WAKEUP
+		m_parent.publish("MREDIS_WAKEUP", "MOEP!");
+	}
+
+
 	return ret;
 }
 
@@ -487,7 +495,7 @@ void MRedisPubsubConnection::read_message() {
 
 		// We may have been woken up by a message, only to be able to see if we 
 		// got outstanding subscriptions
-		if (m_subscriptions_pending.load() > 0) {
+		if ((m_subscriptions_pending.load() > 0) && (m_streambuf.size() == 0)) {
 			m_buffer_busy = false;
 			m_socket.get_io_context().post([this] () {
 				this->finish_subscriptions();

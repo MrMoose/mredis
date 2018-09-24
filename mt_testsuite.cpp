@@ -108,7 +108,7 @@ class EasyPublisherThread {
 				boost::int64_t       current = 0;
 
 				boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
-
+				
 				while (!m_stopped) {
 
 					future_response r = m_redis.publish("easy_int_test", boost::lexical_cast<std::string>(current));

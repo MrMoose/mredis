@@ -185,12 +185,12 @@ void MRedisConnection::async_connect(const std::string &n_server, const boost::u
 void MRedisConnection::stop() noexcept {
 
 	BOOST_LOG_FUNCTION();
-	BOOST_LOG_SEV(logger(), normal) << "MRedis TCP connection shutting down";
-
+	
 	if (m_status == Status::ShuttingDown || m_status == Status::Shutdown) {
-		BOOST_LOG_SEV(logger(), warning) << "Please don't stop TCP connection twice";
 		return;
 	}
+
+	BOOST_LOG_SEV(logger(), normal) << "MRedis TCP connection shutting down";
 
 	m_status = Status::ShuttingDown;
 
@@ -486,6 +486,12 @@ void MRedisConnection::read_response() noexcept {
 bool MRedisConnection::handle_error(const boost::system::error_code n_errc, const char *n_message) const {
 
 	if (!n_errc) {
+		return false;
+	}
+
+	// Most likely an operation has been canceled due to shutdown
+	if (m_status >= Status::ShuttingDown) {
+		BOOST_LOG_SEV(logger(), normal) << "Async operation aborted, shutting down: " << n_errc.message();
 		return false;
 	}
 
