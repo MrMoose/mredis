@@ -191,15 +191,11 @@ int main(int argc, char **argv) {
 		const std::string server_ip_string = vm["server"].as<std::string>();
 // 		const short port = vm["port"].as<short>();
 
-		boost::asio::io_context io_ctx;
-		boost::asio::io_context::work *work = new boost::asio::io_context::work(io_ctx);
-		std::unique_ptr<boost::thread> t(new boost::thread([&]() { io_ctx.run(); }));
-
 		// Testcase 1 - Easy
 		{
 			std::cout << "Running Testcase 1 - Easy mode..." << std::endl;
 
-			AsyncClient client(io_ctx, server_ip_string);
+			AsyncClient client(server_ip_string);
 			client.connect();
 
 			// Let's start simple by having one thread that publishes an increasing number and three that listen 
@@ -245,14 +241,8 @@ int main(int argc, char **argv) {
 // 			easy_subscriber_3.stop();
 			testers.join_all();
 
-			std::cout << "Testcase 1 finished" << std::endl;
+			std::cout << "Testcase 1 finished. Shutting down..." << std::endl;
 		}
-
-
-		std::cout << "\n ... shutting down..." << std::endl;
-		delete work;
-		io_ctx.stop();
-		t->join();
 
 		std::cout << "done" << std::endl;
 

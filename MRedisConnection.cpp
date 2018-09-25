@@ -23,9 +23,9 @@ namespace ip = asio::ip;
 
 MRedisConnection::MRedisConnection(AsyncClient &n_parent)
 		: m_parent(n_parent)
-		, m_socket(n_parent.m_io_context)
-		, m_send_retry_timer(n_parent.m_io_context)
-		, m_receive_retry_timer(n_parent.m_io_context)
+		, m_socket(n_parent.io_context())
+		, m_send_retry_timer(n_parent.io_context())
+		, m_receive_retry_timer(n_parent.io_context())
 		, m_buffer_busy(false)
 		, m_status(Status::Disconnected) {
 
@@ -44,7 +44,7 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 
 	m_status = Status::Connecting;
 
-	ip::tcp::resolver resolver(m_parent.m_io_context);
+	ip::tcp::resolver resolver(m_parent.io_context());
 	ip::tcp::resolver::query query(n_server, boost::lexical_cast<std::string>(n_port), ip::tcp::resolver::query::numeric_service);
 	ip::tcp::resolver::results_type resolved_endpoints = resolver.resolve(query);
 	if (resolved_endpoints.empty()) {
@@ -120,7 +120,7 @@ void MRedisConnection::async_connect(const std::string &n_server, const boost::u
 
 	m_status = Status::Connecting;
 
-	ip::tcp::resolver resolver(m_parent.m_io_context);
+	ip::tcp::resolver resolver(m_parent.io_context());
 	ip::tcp::resolver::query query(n_server, boost::lexical_cast<std::string>(n_port), ip::tcp::resolver::query::numeric_service);
 	ip::tcp::resolver::results_type resolved_endpoints = resolver.resolve(query);
 	if (resolved_endpoints.empty()) {
@@ -215,7 +215,7 @@ void MRedisConnection::send(std::function<void(std::ostream &n_os)> &&n_prepare,
 		m_requests_not_sent.emplace_back(std::move(req));
 	}
 
-	m_parent.m_io_context.post([this]() { this->send_outstanding_requests(); });
+	m_parent.io_context().post([this]() { this->send_outstanding_requests(); });
 }
 
 promised_response_ptr MRedisConnection::send(std::function<void(std::ostream &n_os)> &&n_prepare) noexcept {
@@ -240,7 +240,7 @@ promised_response_ptr MRedisConnection::send(std::function<void(std::ostream &n_
 		m_requests_not_sent.emplace_back(std::move(req));
 	}
 
-	m_parent.m_io_context.post([this]() { this->send_outstanding_requests(); });
+	m_parent.io_context().post([this]() { this->send_outstanding_requests(); });
 
 	return promise;
 }

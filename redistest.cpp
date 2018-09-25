@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
 
 		{
 
-			AsyncClient client(io_ctx, server_ip_string);
+			AsyncClient client(server_ip_string);
 
 			client.connect();
 

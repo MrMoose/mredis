@@ -7,17 +7,17 @@
 #include "MRedisConfig.hpp"
 #include "MRedisResult.hpp"
 
-#include "tools/Macros.hpp"
+#include "tools/Pimpled.hpp"
 
-#include <boost/thread/mutex.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/asio/io_context.hpp>
+
+#include <string>
 
 namespace moose {
 namespace mredis {
 
-MOOSE_FWD_DECLARE_CLASS(MRedisConnection);
-MOOSE_FWD_DECLARE_CLASS(MRedisPubsubConnection);
+struct AsyncClientMembers;
 
 /*! @brief simple async Redis client.
 	And yes, I know. Classes that are described as "simple" generally turn out 
@@ -29,17 +29,17 @@ MOOSE_FWD_DECLARE_CLASS(MRedisPubsubConnection);
 		It relies on the fact that this actually is run. Also, it does not support 
 		multiple threads running that io_context. Implicit strand.
  */
-class AsyncClient {
+class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 
 	public:
 		
 		//! use local unix domain socket
-		MREDIS_API AsyncClient(boost::asio::io_context &n_io_context);
+		MREDIS_API AsyncClient();
 
 		/*! use IP to do TCP connect
 			@note asserts on empty server
 		 */
-		MREDIS_API AsyncClient(boost::asio::io_context &n_io_context, const std::string &n_server, const boost::uint16_t n_port = 6379);
+		MREDIS_API AsyncClient(const std::string &n_server, const boost::uint16_t n_port = 6379);
 
 		MREDIS_API virtual ~AsyncClient() noexcept;
 
@@ -248,16 +248,11 @@ class AsyncClient {
 
 	private:
 
+		boost::asio::io_context &io_context() noexcept;
+
 		friend class MRedisConnection;
 		friend class MRedisPubsubConnection;
-
-		boost::asio::io_context   &m_io_context;
-		const std::string          m_server;            //!< server hostname if TCP
-		const boost::uint16_t      m_port;              //!< server port
-		MRedisConnectionUPtr       m_main_connection;   //!< this connection handles every major command
-		MRedisPubsubConnectionUPtr m_pubsub_connection; //!< connection specific for pubsub messages
 };
 
 }
 }
-

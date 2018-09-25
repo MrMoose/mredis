@@ -140,7 +140,7 @@ void MRedisPubsubConnection::unsubscribe(const boost::uint64_t n_id) {
 	m_pending_subscriptions.push(new pending_subscription{ channel_name, n_id, 0 });
 	m_subscriptions_pending++;
 
-	m_parent.m_io_context.post([this] () {
+	m_parent.io_context().post([this] () {
 
 		this->finish_subscriptions();
 	});
