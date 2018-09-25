@@ -137,7 +137,7 @@ boost::shared_future<bool> AsyncClient::async_connect() {
 	
 	d().m_pubsub_connection.reset(new MRedisPubsubConnection(*this));
 	boost::shared_ptr<boost::promise<bool> > promise1(boost::make_shared<boost::promise<bool> >());
-	d().m_main_connection->async_connect(d().m_server, d().m_port, promise);
+	d().m_pubsub_connection->async_connect(d().m_server, d().m_port, promise1);
 
 	return promise->get_future();
 }

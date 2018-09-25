@@ -196,7 +196,14 @@ int main(int argc, char **argv) {
 			std::cout << "Running Testcase 1 - Easy mode..." << std::endl;
 
 			AsyncClient client(server_ip_string);
-			client.connect();
+		//	client.connect();
+
+			boost::shared_future<bool> ret = client.async_connect();
+			const bool r = ret.get();
+			if (!r) {
+				std::cerr << "Cannot connect" << std::endl;
+				return EXIT_FAILURE;
+			};
 
 			// Let's start simple by having one thread that publishes an increasing number and three that listen 
 			boost::thread_group testers;
@@ -246,9 +253,10 @@ int main(int argc, char **argv) {
 
 		std::cout << "done" << std::endl;
 
+		return EXIT_SUCCESS;
+
 	} catch (const std::exception &sex) {
 		std::cerr << "Unexpected exception reached main: " << sex.what() << std::endl;
-		return EXIT_FAILURE;
 	} catch (...) {
 		std::cerr << "Unhandled error reached main function. Aborting" << std::endl;
 	}
