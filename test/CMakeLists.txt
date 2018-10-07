@@ -4,4 +4,4 @@
 # LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 add_executable(TestRespParsers TestRespParsers.cpp)
-target_link_libraries(TestRespParsers mredis moose_tools ${Boost_LIBRARIES})
+target_link_libraries(TestRespParsers mredis Boost::unit_test_framework)

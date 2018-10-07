@@ -3,12 +3,10 @@
 # Software License, Version 1.0. (See accompanying file
 # LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.6)
 project(mredis)
 
-add_definitions(-DBOOST_THREAD_VERSION=3)
-
-find_package(Boost 1.67.0 COMPONENTS chrono thread system program_options log unit_test_framework  REQUIRED)
+find_package(Boost 1.67.0 REQUIRED COMPONENTS chrono thread system program_options log unit_test_framework)
 
 set(MREDIS_SRC
 	FwdDeclarations.cpp
@@ -31,25 +29,30 @@ set(MREDIS_HDR
 	MRedisPubsubConnection.hpp
 	)
 
-include_directories(
-	SYSTEM
-	${Boost_INCLUDE_DIRS}
-)
-
-include_directories(
-	${mredis_SOURCE_DIR}/..
-	${CMAKE_CURRENT_SOURCE_DIR}
-)
-
-if (${MOOSE_STATIC_BUILD})
-	add_library(mredis STATIC ${MREDIS_SRC} ${MREDIS_HDR})
-else()
-	add_definitions(-DMREDIS_DLL)
-	add_library(mredis SHARED ${MREDIS_SRC} ${MREDIS_HDR})
+add_library(mredis ${MREDIS_SRC} ${MREDIS_HDR})
+if (${BUILD_SHARED_LIBS})
+	target_compile_definitions(mredis PUBLIC -DMREDIS_DLL)
 endif()
 
-target_link_libraries(mredis
-	${Boost_LIBRARIES}
+target_link_libraries(mredis 
+	PUBLIC
+		moose_tools
+		Boost::boost
+	PRIVATE
+		Boost::thread
+		Boost::system
+)
+
+target_include_directories(mredis
+   PUBLIC 
+        $<INSTALL_INTERFACE:mredis>    
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_compile_definitions(mredis
+	PRIVATE "-DBOOST_THREAD_VERSION=3"
 )
 
 add_subdirectory(test)
@@ -59,15 +62,13 @@ add_test(NAME TestRespParsers COMMAND TestRespParsers)
 add_executable(redistest redistest.cpp)
 target_link_libraries(redistest
 	mredis
-	moose_tools
-	${Boost_LIBRARIES}
+	Boost::program_options
 )
 
 add_executable(mt_testsuite mt_testsuite.cpp)
 target_link_libraries(mt_testsuite
 	mredis
-	moose_tools
-	${Boost_LIBRARIES}
+	Boost::program_options
 )
 
 
