@@ -79,18 +79,9 @@ int main(int argc, char **argv) {
 
 		{
 
-			AsyncClient client(io_ctx, server_ip_string);
+			AsyncClient client(server_ip_string);
 
 			client.connect();
-
-// 			client.hincrby("myhash", "field", 1, [](const RESPonse &n_response) {
-// 
-// 				if (n_response.which() == 2) {
-// 					std::cout << "Response: " << boost::get<boost::int64_t>(n_response) << std::endl;
-// 				} else {
-// 					std::cerr << "Unexpected response: " << n_response.which() << std::endl;
-// 				}
-// 			});
 
 			future_response fr1 = client.hincrby("myhash", "field", 1);
 			future_response fr2 = client.hincrby("myhash", "field", 1);
@@ -127,6 +118,32 @@ int main(int argc, char **argv) {
 			output_result(fr12);
 			output_result(fr13);
 			output_result(fr14);
+
+			client.hset("myhash", "testfield", "moep");
+			client.hget("myhash", "testfield", [](const RESPonse &n_response) {
+			
+				// I expect the response to be a string containing a simple date time format
+				if (n_response.which() != 1) {
+					std::cerr << "not a string response: " << n_response.which();
+				} else {
+					std::cout << "Response: " << boost::get<std::string>(n_response) << std::endl;
+				}
+			});
+
+			boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+			client.set("myval:437!:test_key", "This is my Test!");
+			
+			future_response sr1 = client.get("myval:437!:test_key");
+
+			RESPonse srr1 = sr1.get();
+				
+			// I expect the response to be a string containing a simple date time format
+			if (srr1.which() != 1) {
+				std::cerr << "not a string response: " << srr1.which() << std::endl;
+			} else {
+				std::cout << "Response string get: " << boost::get<std::string>(srr1) << std::endl;
+			}
+			
 		}
 
 

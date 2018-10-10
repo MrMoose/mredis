@@ -5,10 +5,11 @@
 
 #pragma once
 #include "MRedisConfig.hpp"
-#include "MRedisTCPConnection.hpp"
+#include "MRedisConnection.hpp"
 #include "RESP.hpp"
 
 #include <boost/asio.hpp>
+#include <boost/lockfree/queue.hpp>
 
 #include <functional>
 #include <string>
@@ -20,13 +21,13 @@ namespace mredis {
 
 class AsyncClient;
 
-class MRedisTCPConnection {
+class MRedisConnection {
 
 	public:
-		MRedisTCPConnection(AsyncClient &n_parent);
-		MRedisTCPConnection(const MRedisTCPConnection &) = delete;
-		virtual ~MRedisTCPConnection() noexcept;
-		MRedisTCPConnection &operator=(const MRedisTCPConnection &) = delete;
+		MRedisConnection(AsyncClient &n_parent);
+		MRedisConnection(const MRedisConnection &) = delete;
+		virtual ~MRedisConnection() noexcept;
+		MRedisConnection &operator=(const MRedisConnection &) = delete;
 
 		//! This blocks until connected or throws on error
 		void connect(const std::string &n_server, const boost::uint16_t n_port = 6379);
@@ -34,21 +35,28 @@ class MRedisTCPConnection {
 		//! This doesn't block and sets promise upon done
 		void async_connect(const std::string &n_server, const boost::uint16_t n_port, boost::shared_ptr<boost::promise<bool> > n_ret);
 
-
 		/*! @brief shut the connection down.
 			There may still be cancelled handlers on the io_service for it. Make sure you poll before 
 				actually destroying the connections
 		 */
-		void stop() noexcept;
+		virtual void stop() noexcept;
 
+		/*! @brief send an unknown command that can be filled by the caller via n_prepare		
+		 */
+		void send(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept;
+
+		/*! @brief send an unknown command that can be filled by the caller via n_prepare	
+		 */
+		promised_response_ptr send(std::function<void(std::ostream &n_os)> &&n_prepare) noexcept;
+
+	protected:
 		/*! send an unknown command that can be filled by the caller via n_prepare
 			must be called from io_service thread
+
+			@note deprecated, i try to be queue only
+
 		 */
-		void send_command(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept;
-
-
-
-	private:
+		void send_command_orig(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept;
 
 		//! assume there are some and go send
 		void send_outstanding_requests() noexcept;
@@ -65,18 +73,21 @@ class MRedisTCPConnection {
 			Disconnected = 0,
 			Connecting,
 			Connected,
-			Pushing,
-			Pulling,
+			Pushing,          // normal mode connection
+			Pubsub,           // pubsub connection
 			ShuttingDown,
 			Shutdown
 		};
 
 		AsyncClient                 &m_parent;
 		boost::asio::ip::tcp::socket m_socket;              //!< Socket for the connection.	
-		boost::asio::streambuf       m_streambuf;           //!< use for reading packets and headers on upstream
+		boost::asio::streambuf       m_streambuf;           //!< use for reading and writing both
 		boost::asio::steady_timer    m_send_retry_timer;    //!< when buffer is in use for sending, retry after a few micros
 		boost::asio::steady_timer    m_receive_retry_timer; //!< when buffer is in use for receiving, retry after a few micros
+		
+		boost::mutex                 m_request_queue_lock;
 		std::deque<mrequest>         m_requests_not_sent;
+
 		std::deque<Callback>         m_outstanding;
 
 		bool                         m_buffer_busy;        //!< streambuf in use
