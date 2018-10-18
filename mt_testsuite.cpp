@@ -87,7 +87,7 @@ class EasySubscriberThread {
 
 	private:
 		boost::uint64_t      m_subscription = 0;
-		boost::atomic<bool>  m_stopped;
+		boost::atomic<bool>  m_stopped;		
 		AsyncClient         &m_redis;
 };
 
