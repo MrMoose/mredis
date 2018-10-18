@@ -43,7 +43,9 @@ class EasySubscriberThread {
 
 	public:
 		EasySubscriberThread(AsyncClient &n_redis)
-				: m_redis(n_redis) {
+				: m_error(false)
+				, m_stopped(false)
+				, m_redis(n_redis) {
 		}
 
 		void stop() noexcept {
@@ -80,12 +82,12 @@ class EasySubscriberThread {
 			}
 		}
 
-		boost::atomic<bool>  m_error = false;    //!< once any error indication is met, this turns true
+		boost::atomic<bool>  m_error;          //!< once any error indication is met, this turns true
 		boost::int64_t       m_last = 0;
 
 	private:
 		boost::uint64_t      m_subscription = 0;
-		boost::atomic<bool>  m_stopped = false;		
+		boost::atomic<bool>  m_stopped;
 		AsyncClient         &m_redis;
 };
 
@@ -94,7 +96,9 @@ class EasyPublisherThread {
 
 	public:
 		EasyPublisherThread(AsyncClient &n_redis)
-				: m_redis(n_redis) {
+				: m_error(false)
+				, m_stopped(false)
+				, m_redis(n_redis) {
 		}
 
 		void stop() noexcept {
@@ -143,10 +147,10 @@ class EasyPublisherThread {
 			}
 		}
 
-		boost::atomic<bool>  m_error = false;    //!< once any error indication is met, this turns true
+		boost::atomic<bool>  m_error;    //!< once any error indication is met, this turns true
 
 	private:
-		boost::atomic<bool>  m_stopped = false;
+		boost::atomic<bool>  m_stopped;
 		AsyncClient         &m_redis;
 };
 
