@@ -178,6 +178,51 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 		/*! @} */
 
 
+		/*! @defgroup list functions
+			They too assert when connect wasn't called.
+			@{
+		*/
+		/*! @brief push a string to the head of a list
+			@param n_list_name the name of your list
+			@param n_value what to insert
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/lpush
+		*/
+		MREDIS_API void lpush(const std::string &n_list_name,
+								const std::string &n_value,
+								Callback &&n_callback) noexcept;
+
+		/*! @brief push a string to the head of a list
+			@param n_list_name the name of your set
+			@param n_value what to insert
+
+			@returns future int with length of the list after push, may also hold exception
+			@see https://redis.io/commands/lpush
+		*/
+		MREDIS_API future_response lpush(const std::string &n_list_name, const std::string &n_value) noexcept;
+
+		/*! @brief push a string to the end of a list
+			@param n_list_name the name of your list
+			@param n_value what to insert
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/rpush
+		 */
+		MREDIS_API void rpush(const std::string &n_list_name,
+								const std::string &n_value,
+								Callback &&n_callback) noexcept;
+
+		/*! @brief push a string to the end of a list
+			@param n_list_name the name of your set
+			@param n_value what to insert
+
+			@returns future int with length of the list after push, may also hold exception
+			@see https://redis.io/commands/rpush
+		*/
+		MREDIS_API future_response rpush(const std::string &n_list_name, const std::string &n_value) noexcept;
+
+		/*! @} */
+
+
 		/*! @defgroup unordered set functions
 			They too assert when connect wasn't called.
 			@{

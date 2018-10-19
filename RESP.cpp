@@ -207,6 +207,18 @@ void format_hset(std::ostream &n_os, const std::string &n_hash_name, const std::
 			" ", n_hash_name, n_field_name, n_value);
 }
 
+void format_lpush(std::ostream &n_os, const std::string &n_list_name, const std::string &n_value) {
+
+	n_os << karma::format_delimited("LPUSH" << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
+			" ", n_list_name, n_value);
+}
+
+void format_rpush(std::ostream &n_os, const std::string &n_list_name, const std::string &n_value) {
+
+	n_os << karma::format_delimited("RPUSH" << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
+			" ", n_list_name, n_value);
+}
+
 void format_sadd(std::ostream &n_os, const std::string &n_set_name, const std::string &n_value) {
 
 	n_os << karma::format_delimited("SADD" << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
