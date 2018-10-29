@@ -6,6 +6,7 @@
 #pragma once
 #include "MRedisConfig.hpp"
 #include "MRedisResult.hpp"
+#include "MRedisTypes.hpp"
 
 #include "tools/Pimpled.hpp"
 
@@ -75,21 +76,48 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 		 */
 		MREDIS_API future_response get(const std::string &n_key) noexcept;
 
-		/*! @brief most basic set
+		/*! @brief set with a vengeance
 			@param n_key assert on empty
-			@param n_value
+			@param n_value may be binary
 			@param n_callback must be no-throw, will not be executed in caller's thread
+			@param n_expire_time will only be set if not c_invalid_duration. Uses second precision to not fool around
+			@param n_condition optional set condition
 			@see https://redis.io/commands/set
-		 */
-		MREDIS_API void set(const std::string &n_key, const std::string &n_value, Callback &&n_callback) noexcept;
+		*/
+		MREDIS_API void set(const std::string &n_key,
+		                    const std::string &n_value,
+		                    Callback &&n_callback, 
+		                    const Duration &n_expire_time = c_invalid_duration,
+		                    const SetCondition n_condition = SetCondition::NONE) noexcept;
 
-		/*! @brief most basic set
+		/*! @brief set with a vengeance
 			@param n_key assert on empty
-			@param n_value
+			@param n_value may be binary
+			@param n_expire_time will only be set if not c_invalid_duration. Uses second precision to not fool around
+			@param n_condition optional set condition
 			@returns future which will hold response, may also hold exception
 			@see https://redis.io/commands/set
 		*/
-		MREDIS_API future_response set(const std::string &n_key, const std::string &n_value) noexcept;
+		MREDIS_API future_response set(const std::string &n_key,
+		                               const std::string &n_value, 
+		                               const Duration &n_expire_time = c_invalid_duration,
+		                               const SetCondition n_condition = SetCondition::NONE) noexcept;
+
+		/*! @brief delete a value
+			@param n_key assert on empty
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@returns future which will hold response (1), may also hold exception
+			@see https://redis.io/commands/del
+		*/
+		MREDIS_API void del(const std::string &n_key, Callback &&n_callback) noexcept;
+
+		/*! @brief delete a value
+			@param n_key assert on empty		
+			@returns future which will hold response (1), may also hold exception
+			@see https://redis.io/commands/del
+		*/
+		MREDIS_API future_response del(const std::string &n_key) noexcept;
+
 
 		/*! @brief field increment by 1
 			@param n_key assert on empty

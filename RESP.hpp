@@ -6,16 +6,18 @@
 #pragma once
 #include "MRedisConfig.hpp"
 #include "MRedisResult.hpp"
+#include "MRedisTypes.hpp"
 
 #include <boost/variant.hpp>
 #include <boost/cstdint.hpp>
-#include <boost/asio/streambuf.hpp>
 
 #include <iostream>
 #include <string>
+#include <chrono>
 
 namespace moose {
 namespace mredis {
+
 
 // debug
 MREDIS_API bool parse(const std::string &n_input, RESPonse &n_response);
@@ -32,7 +34,11 @@ MREDIS_API void format_ping(std::ostream &n_os);
 MREDIS_API void format_get(std::ostream &n_os, const std::string &n_key);
 
 //! @return integer
-MREDIS_API void format_set(std::ostream &n_os, const std::string &n_key, const std::string &n_value);
+MREDIS_API void format_set(std::ostream &n_os, const std::string &n_key, const std::string &n_value,
+			const Duration &n_expire_time, const SetCondition n_condition);
+
+//! @return int (1)
+MREDIS_API void format_del(std::ostream &n_os, const std::string &n_key);
 
 //! @return integer
 MREDIS_API void format_incr(std::ostream &n_os, const std::string &n_key);

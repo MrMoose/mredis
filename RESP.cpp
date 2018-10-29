@@ -173,25 +173,75 @@ void format_get(std::ostream &n_os, const std::string &n_key) {
 	n_os << karma::format_delimited("GET" << karma::string << karma::no_delimit["\r\n"], " ", n_key);
 }
 
-void format_set(std::ostream &n_os, const std::string &n_key, const std::string &n_value) {
+void format_set(std::ostream &n_os, const std::string &n_key, const std::string &n_value, 
+		const Duration &n_expire_time, const SetCondition n_condition) {
 
 	// naive approach
 	// This will fail once the string contains null bytes or hyphens or anything else that needs quoting
 //	n_os << karma::format_delimited("SET" << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
 //		" ", n_key, n_value);
 
+	int num_fields = 3;
+	std::string expire_time_str;
+	
+	if (n_expire_time != c_invalid_duration) {
+		// I need to pre-format this because I can't otherwise know the length in advance
+		expire_time_str.reserve(16);
+		std::back_insert_iterator<std::string> out(expire_time_str);
+		karma::generate(out, uint_, std::chrono::duration_cast<std::chrono::seconds>(n_expire_time).count());
+		num_fields += 2;
+	}
+	
+	if (n_condition != SetCondition::NONE) {
+		num_fields++;
+	}
+
+	// Protocol expects a bulk string to know its length in advance.
+
 	// sending everything as bulk strings prevents that from being a problem
 	// What I don't know is: Are there any disadvantages of always using the bulk string approach?
 	// Why would I ever choose the former, except for simplicity and documentation purposes?
 	n_os << karma::format_delimited(
-		lit("*3") <<                // Array of three
+		no_delimit['*'] << uint_ << // Array of how many fields...
 		lit("$3") <<                // Bulk string of length 3  (length of the term "SET")
 		lit("SET") <<               // set command
 		no_delimit['$'] << uint_ << // binary length of key
 		string <<                   // key
 		no_delimit['$'] << uint_ << // binary length of value
 		string                      // value
-		, "\r\n", n_key.size(), n_key, n_value.size(), n_value);
+		, "\r\n", num_fields, n_key.size(), n_key, n_value.size(), n_value);
+
+	if (n_expire_time != c_invalid_duration) {
+		n_os << karma::format_delimited(
+			lit("$2") <<                 // Bulk string of length 2 for "EX"
+			lit("EX") <<
+			no_delimit['$'] << uint_ <<  // Bulk string for expiry time
+			string
+			, "\r\n", expire_time_str.size(), expire_time_str);
+	}
+
+	switch (n_condition) {
+		default:
+		case SetCondition::NONE:
+			break;
+		case SetCondition::NX:
+			n_os.write("$2\r\nNX\r\n", 8);
+			break;
+		case SetCondition::XX:
+			n_os.write("$2\r\nXX\r\n", 8);
+			break;
+	}
+}
+
+void format_del(std::ostream &n_os, const std::string &n_key) {
+	
+	n_os << karma::format_delimited(
+		lit("*2") <<                // Array of 2 fields...
+		lit("$3") <<                // Bulk string of length 3  (length of the term "SET")
+		lit("DEL") <<               // set command
+		no_delimit['$'] << uint_ << // binary length of key
+		string                      // key
+		, "\r\n", n_key.size(), n_key);
 }
 
 void format_incr(std::ostream &n_os, const std::string &n_key) {

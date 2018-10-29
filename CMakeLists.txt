@@ -14,6 +14,7 @@ set(MREDIS_SRC
 	RESP.cpp
 	MRedisResult.cpp
 	MRedisError.cpp
+	MRedisTypes.cpp
 	MRedisConnection.cpp
 	MRedisPubsubConnection.cpp
 	)
@@ -25,6 +26,7 @@ set(MREDIS_HDR
 	RESP.hpp
 	MRedisResult.hpp
 	MRedisError.hpp
+	MRedisTypes.hpp
 	MRedisConnection.hpp
 	MRedisPubsubConnection.hpp
 	)

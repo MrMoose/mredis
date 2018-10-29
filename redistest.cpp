@@ -6,6 +6,7 @@
 #include "mredis/AsyncClient.hpp"
 
 #include "tools/Log.hpp"
+#include "tools/Error.hpp"
 
 #include <boost/config.hpp>
 #include <boost/thread.hpp>
@@ -22,11 +23,11 @@
 #include <string>
 
 using namespace moose::mredis;
-
+using namespace moose::tools;
 
 std::string server_ip_string;
 
-void output_result(future_response &n_response) {
+void output_int_result(future_response &n_response) {
 
 	RESPonse response = n_response.get();
 
@@ -37,6 +38,41 @@ void output_result(future_response &n_response) {
 	};
 }
 
+void expect_string_result(future_response &n_response) {
+
+	RESPonse response = n_response.get();
+
+	if (response.which() == 1) {
+		std::cout << "Got string response: " << boost::get<std::string>(response) << std::endl;
+	} else {
+		BOOST_THROW_EXCEPTION(redis_error() << error_message("Not a string response"));
+	};
+}
+
+void expect_string_result(future_response &n_response, const std::string &n_expected_string) {
+
+	RESPonse response = n_response.get();
+
+	if (response.which() == 1) {
+		if (boost::get<std::string>(response) != n_expected_string) {
+			BOOST_THROW_EXCEPTION(redis_error() << error_message("Unexpected string response")
+					<< error_argument(boost::get<std::string>(response)));
+		}
+	} else {
+		BOOST_THROW_EXCEPTION(redis_error() << error_message("Not a string response"));
+	};
+}
+
+void expect_null_result(future_response &n_response) {
+
+	RESPonse response = n_response.get();
+
+	if (response.which() == 3) {
+		std::cout << "Got expected null response" << std::endl;
+	} else {
+		BOOST_THROW_EXCEPTION(redis_error() << error_message("Not a null response"));
+	};
+}
 
 void test_binary_get() {
 	
@@ -60,6 +96,44 @@ void test_binary_get() {
 	}
 }
 
+// Test setting a value with additional parameters
+void test_extended_set_params() {
+
+	// Test getting and setting a binary value with at least one null byte in it.
+	const std::string sample("Hello World!");
+
+	AsyncClient client(server_ip_string);
+	client.connect();
+
+	// Delete possibly existing test value
+	client.del("no_exp");
+
+	// First try to set value without XX should fail
+	expect_null_result(client.set("no_exp", sample, c_invalid_duration, SetCondition::XX));
+	
+	// Now set the value with NX should succeed
+	expect_string_result(client.set("no_exp", sample, c_invalid_duration, SetCondition::NX), "OK");
+
+	// Check the value
+	expect_string_result(client.get("no_exp"), sample);
+	
+	// Now the value should be set. Setting it again with XX should succeed
+	expect_string_result(client.set("no_exp", sample, c_invalid_duration, SetCondition::XX), "OK");
+
+	// Delete the value again
+	client.del("no_exp");
+
+	// And set it with an expiry time of one second
+	expect_string_result(client.set("no_exp", sample, std::chrono::seconds(1)), "OK");
+	expect_string_result(client.get("no_exp"), sample);
+
+	// wait just over a second
+	boost::this_thread::sleep_for(boost::chrono::milliseconds(1100));
+
+	// and see if the value disappeared
+	expect_null_result(client.get("no_exp"));
+}
+
 // several test from when this was a new thing
 void test_hincr_by() {
 	
@@ -74,13 +148,13 @@ void test_hincr_by() {
 	future_response fr6 = client.hincrby("myhash", "field", 1);
 	future_response fr7 = client.hincrby("myhash", "field", 1);
 
-	output_result(fr1);
-	output_result(fr2);
-	output_result(fr3);
-	output_result(fr4);
-	output_result(fr5);
-	output_result(fr6);
-	output_result(fr7);
+	output_int_result(fr1);
+	output_int_result(fr2);
+	output_int_result(fr3);
+	output_int_result(fr4);
+	output_int_result(fr5);
+	output_int_result(fr6);
+	output_int_result(fr7);
 
 	std::cout << "Wait a sec... " << std::endl;
 	boost::this_thread::sleep_for(boost::chrono::seconds(1));
@@ -94,13 +168,13 @@ void test_hincr_by() {
 	future_response fr13 = client.hincrby("myhash", "field", 1);
 	future_response fr14 = client.hincrby("myhash", "field", 1);
 
-	output_result(fr8);
-	output_result(fr9);
-	output_result(fr10);
-	output_result(fr11);
-	output_result(fr12);
-	output_result(fr13);
-	output_result(fr14);
+	output_int_result(fr8);
+	output_int_result(fr9);
+	output_int_result(fr10);
+	output_int_result(fr11);
+	output_int_result(fr12);
+	output_int_result(fr13);
+	output_int_result(fr14);
 
 	client.hset("myhash", "testfield", "moep");
 	client.hget("myhash", "testfield", [] (const RESPonse &n_response) {
@@ -162,6 +236,8 @@ int main(int argc, char **argv) {
 		server_ip_string = vm["server"].as<std::string>();
 
 		test_binary_get();
+
+		test_extended_set_params();
 
 		test_hincr_by();
 
