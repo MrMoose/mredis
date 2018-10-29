@@ -282,7 +282,7 @@ void MRedisConnection::send_command_orig(std::function<void(std::ostream &n_os)>
 		m_buffer_busy = true;
 
 		{
-			std::ostream os(&m_streambuf);
+			std::ostream os(&m_streambuf, std::ostream::binary);
 
 			// See if we have unsent requests and stream them first in the order they came in
 			for (mrequest &req : m_requests_not_sent) {
@@ -350,7 +350,7 @@ void MRedisConnection::send_outstanding_requests() noexcept {
 		m_buffer_busy = true;
 
 		{
-			std::ostream os(&m_streambuf);
+			std::ostream os(&m_streambuf, std::ostream::binary);
 
 //			BOOST_LOG_SEV(logger(), debug) << "Sending " << m_requests_not_sent.size() << " outstanding requests";
 			

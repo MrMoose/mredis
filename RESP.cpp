@@ -148,6 +148,13 @@ struct response_parser : qi::grammar<InputIterator, RESPonse()> {
 	qi::rule<InputIterator, RESPonse()>  m_start;
 };
 
+using karma::no_delimit;
+using karma::repeat;
+using karma::uint_;
+using karma::byte_;
+using karma::string;
+using karma::lit;
+
 bool parse(const std::string &n_input, RESPonse &n_response) {
 
 	std::string::const_iterator first = n_input.cbegin();
@@ -166,22 +173,25 @@ void format_get(std::ostream &n_os, const std::string &n_key) {
 	n_os << karma::format_delimited("GET" << karma::string << karma::no_delimit["\r\n"], " ", n_key);
 }
 
-/*! @todo
-
-In order for set to be able to use binary data, use this:
-
-*3<crlf>
-$3<crlf>SET<crlf>
-${binary_key_length}<crlf>{binary_key_data}<crlf>
-${binary_data_length}<crlf>{binary_data}<crlf>
-
-
-*/
-
 void format_set(std::ostream &n_os, const std::string &n_key, const std::string &n_value) {
 
-	n_os << karma::format_delimited("SET" << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
-			" ", n_key, n_value);
+	// naive approach
+	// This will fail once the string contains null bytes or hyphens or anything else that needs quoting
+//	n_os << karma::format_delimited("SET" << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
+//		" ", n_key, n_value);
+
+	// sending everything as bulk strings prevents that from being a problem
+	// What I don't know is: Are there any disadvantages of always using the bulk string approach?
+	// Why would I ever choose the former, except for simplicity and documentation purposes?
+	n_os << karma::format_delimited(
+		lit("*3") <<                // Array of three
+		lit("$3") <<                // Bulk string of length 3  (length of the term "SET")
+		lit("SET") <<               // set command
+		no_delimit['$'] << uint_ << // binary length of key
+		string <<                   // key
+		no_delimit['$'] << uint_ << // binary length of value
+		string                      // value
+		, "\r\n", n_key.size(), n_key, n_value.size(), n_value);
 }
 
 void format_incr(std::ostream &n_os, const std::string &n_key) {

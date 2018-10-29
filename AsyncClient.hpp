@@ -250,6 +250,41 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 
 		/*! @} */
 
+
+		/*! @defgroup Lua
+			
+			@{
+		*/
+
+		class LuaArgument {
+			public:
+				//! Will throw when either key or value are empty
+				MREDIS_API LuaArgument(std::string &&n_key, std::string &&n_value);
+
+			private:
+				const std::string m_key;
+				const std::string m_value;
+		};
+		
+		/*! @brief Evaluate the Lua script and return whatever the server says
+			@param n_script assert on empty. Will not be checked by client in any way
+			@param n_args should of course correspond to what you do in the script
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/eval
+		 */
+		MREDIS_API void eval(const std::string &n_script, const std::vector<LuaArgument> &n_args, Callback &&n_callback) noexcept;
+
+		/*! @brief Evaluate the Lua script and return whatever the server says
+			@param n_script assert on empty. Will not be checked by client in any way
+			@param n_args should of course correspond to what you do in the script
+			@returns future which will hold response, may also hold exception
+			@see https://redis.io/commands/eval
+		*/
+		MREDIS_API future_response eval(const std::string &n_script, const std::vector<LuaArgument> &n_args) noexcept;
+
+		/*! @} */
+
+
 		/*! @defgroup pub/sub functions
 			Subcribe to channels and publish messages upon them
 			@{

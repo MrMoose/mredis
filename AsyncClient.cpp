@@ -357,5 +357,11 @@ boost::asio::io_context &AsyncClient::io_context() noexcept {
 	return d().m_io_context;
 }
 
+AsyncClient::LuaArgument::LuaArgument(std::string &&n_key, std::string &&n_value)
+		: m_key(n_key)
+		, m_value(n_value) {
+
+}
+
 }
 }
