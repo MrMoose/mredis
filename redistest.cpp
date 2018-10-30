@@ -96,6 +96,35 @@ void test_binary_get() {
 	}
 }
 
+// test the eval command a bit. I'll try not to actually test Lua as this is supposed to 
+// be way out of scope. So I'll keep the actual scripts minimal
+void test_lua() {
+
+	AsyncClient client(server_ip_string);
+	client.connect();
+
+	// Very simple set
+	expect_string_result(
+		client.eval("return redis.call('set', 'foo', 'bar')", std::vector<LuaArgument>()),
+		"OK"
+	);
+
+	// Set with binary arguments
+	LuaArgument arg1(std::string("Hel\r\nlo", 7), std::string("W\0rld", 5));
+	expect_string_result(
+		client.eval("return redis.call('set', KEYS[1], ARGV[1])", arg1),
+		"OK"
+	);
+
+	// get the binary string back using regular get and expect to be same
+	expect_string_result(client.get(std::string("Hel\r\nlo", 7)), std::string("W\0rld", 5));
+		
+	// cleanup
+	client.del(std::string("Hel\r\nlo", 7));
+	client.del("foo");
+}
+
+
 // Test setting a value with additional parameters
 void test_extended_set_params() {
 
@@ -190,17 +219,10 @@ void test_hincr_by() {
 	boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
 	client.set("myval:437!:test_key", "This is my Test!");
 
-	future_response sr1 = client.get("myval:437!:test_key");
-
-	RESPonse srr1 = sr1.get();
-
-	// I expect the response to be a string containing a simple date time format
-	if (srr1.which() != 1) {
-		std::cerr << "not a string response: " << srr1.which() << std::endl;
-	} else {
-		std::cout << "Response string get: " << boost::get<std::string>(srr1) << std::endl;
-	}
-
+	expect_string_result(client.get("myval:437!:test_key"), "This is my Test!");
+	
+	// cleanup
+	client.del("myval:437!:test_key");
 }
 
 
@@ -239,6 +261,8 @@ int main(int argc, char **argv) {
 
 		test_extended_set_params();
 
+		test_lua();
+
 		test_hincr_by();
 
 
@@ -246,6 +270,8 @@ int main(int argc, char **argv) {
 
 		return EXIT_SUCCESS;
 
+	} catch (const moose_error &merr) {
+		std::cerr << "Exception executing test cases: " << boost::diagnostic_information(merr) << std::endl;
 	} catch (const std::exception &sex) {
 		std::cerr << "Unexpected exception reached main: " << sex.what() << std::endl;
 	} catch (...) {

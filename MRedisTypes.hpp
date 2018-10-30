@@ -29,10 +29,25 @@ MOOSE_TOOLS_API enum class SetCondition {
 	XX           //!< set only if it does already exist
 };
 
+class LuaArgument {
+	
+	public:
+		//! Will throw when either key or value are empty
+		MREDIS_API LuaArgument(std::string &&n_key, std::string &&n_value);
 
-#if defined(BOOST_MSVC)
-MOOSE_TOOLS_API void MRedisTypesGetRidOfLNK4221();
-#endif
+		// inline getters should only be available within the lib
+		const std::string &key() const {
+			return m_key;
+		}
+
+		const std::string &value() const {
+			return m_value;
+		}
+
+	private:
+		const std::string m_key;
+		const std::string m_value;
+};
 
 }
 }

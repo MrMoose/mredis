@@ -170,7 +170,13 @@ void format_ping(std::ostream &n_os) {
 
 void format_get(std::ostream &n_os, const std::string &n_key) {
 
-	n_os << karma::format_delimited("GET" << karma::string << karma::no_delimit["\r\n"], " ", n_key);
+	n_os << karma::format_delimited(
+		lit("*2") <<                // Array of 2 fields...
+		lit("$3") <<                // Bulk string of length 3 (length of the term "GET")
+		lit("GET") <<               // Get command
+		no_delimit['$'] << uint_ << // binary length of key
+		string                      // key
+		, "\r\n", n_key.size(), n_key);
 }
 
 void format_set(std::ostream &n_os, const std::string &n_key, const std::string &n_value, 
@@ -181,7 +187,7 @@ void format_set(std::ostream &n_os, const std::string &n_key, const std::string 
 //	n_os << karma::format_delimited("SET" << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
 //		" ", n_key, n_value);
 
-	int num_fields = 3;
+	unsigned int num_fields = 3;
 	std::string expire_time_str;
 	
 	if (n_expire_time != c_invalid_duration) {
@@ -283,6 +289,50 @@ void format_sadd(std::ostream &n_os, const std::string &n_set_name, const std::s
 
 	n_os << karma::format_delimited("SADD" << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
 			" ", n_set_name, n_value);
+}
+
+void format_eval(std::ostream &n_os, const std::string &n_script, const std::vector<LuaArgument> &n_args) {
+
+	// This is Lua script eval. I am assuming the script doesn't contain anything weird (null bytes)
+	// It does however contain lots of newlines.
+	// The keys and values however might contain binary. So I try the bulk approach first
+
+	// According to how I read the protocol specs Redis should accept arrays of mixed types
+	// However whenever I do it I get a protocol error. So I convert the number of arguments
+	// to a string first. This should not be necessary
+
+	std::string argstr;
+	std::back_insert_iterator<std::string> out(argstr);
+	karma::generate(out, uint_, n_args.size());
+
+	const std::size_t num_fields = 3    // EVAL $SCRIPT $NUMBER_OF_ARGUMENTS ...
+			+ n_args.size() * 2;         // each argument as one key and one value
+
+	n_os << karma::format_delimited(
+		no_delimit['*'] << uint_ << // Array of how many fields...
+		lit("$4") <<                // Bulk string of length 4 (length of the term "EVAL")
+		lit("EVAL") <<              // eval command
+		no_delimit['$'] << uint_ << // binary length of script
+		string <<                   // script
+		no_delimit['$'] << uint_ << // length of number of arguments string
+		string                      // number of arguments string
+		, "\r\n", num_fields, n_script.size(), n_script, argstr.size(), argstr);
+
+	// First all the keys
+	for (const LuaArgument &a: n_args) {
+		n_os << karma::format_delimited(
+			no_delimit['$'] << uint_ << // binary length of script
+			string                      // script
+			, "\r\n", a.key().size(), a.key());
+	}
+
+	// Now again for all the values
+	for (const LuaArgument &a : n_args) {
+		n_os << karma::format_delimited(
+			no_delimit['$'] << uint_ << // binary length of script
+			string                      // script
+			, "\r\n", a.value().size(), a.value());
+	}
 }
 
 void format_subscribe(std::ostream &n_os, const std::string &n_channel_name) {
