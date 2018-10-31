@@ -35,7 +35,8 @@ class LuaArgument {
 		//! Will throw when either key or value are empty
 		MREDIS_API LuaArgument(std::string &&n_key, std::string &&n_value);
 
-		// inline getters should only be available within the lib
+		// inline getters should only be available within the lib.
+		// Hence the missing decorators
 		const std::string &key() const {
 			return m_key;
 		}

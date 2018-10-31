@@ -123,14 +123,16 @@ void test_lua() {
 	// a little more complex script that increases a number of seats and occupies one if available
 	client.set("used_seats", "3");
 
-	const std::string add_seat(
-		"local used_seats = redis.call('get', 'used_seats') \r\n"
-		"if used_seats < 4 then                             \r\n"
-		"    redis.call('incr', 'used_seats')               \r\n"
-		"    redis.call('set', KEYS[1], ARGV[1])            \r\n"
-		"    return 'OK'                                    \r\n"
-		"else                                               \r\n"
-		"    return nil                                     \r\n"
+	const std::string add_seat( // It appears as if everything is type-less stored as string. 
+		                        // In order to make Lua know I intend to treat it as a number, I have
+		                        // to explicitly use tonumber()
+		"local used_seats = tonumber(redis.call('get', 'used_seats'))"
+		"if used_seats < 4 then                                      "
+		"    redis.call('incr', 'used_seats')                        "
+		"    redis.call('set', KEYS[1], ARGV[1])                     "
+		"    return 'OK'                                             "
+		"else                                                        "
+		"    return nil                                              "
 		"end"
 	);
 

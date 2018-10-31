@@ -8,9 +8,6 @@
 
 #include "tools/Macros.hpp"
 
-#include <boost/cstdint.hpp>
-#include <map>
-
 namespace moose {
 namespace mredis {
 
