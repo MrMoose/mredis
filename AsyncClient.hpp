@@ -100,7 +100,7 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 			@see https://redis.io/commands/set
 		*/
 		MREDIS_API future_response set(const std::string &n_key,
-		                               const std::string &n_value, 
+		                               const std::string &n_value,
 		                               const Duration &n_expire_time = c_invalid_duration,
 		                               const SetCondition n_condition = SetCondition::NONE) noexcept;
 

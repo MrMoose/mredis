@@ -29,7 +29,7 @@ std::string server_ip_string;
 
 void output_int_result(future_response &n_response) {
 
-	RESPonse response = n_response.get();
+	RedisMessage response = n_response.get();
 
 	if (response.which() == 2) {
 		std::cout << "Response: " << boost::get<boost::int64_t>(response) << std::endl;
@@ -40,7 +40,7 @@ void output_int_result(future_response &n_response) {
 
 void expect_string_result(future_response &n_response) {
 
-	RESPonse response = n_response.get();
+	RedisMessage response = n_response.get();
 
 	if (response.which() == 1) {
 		std::cout << "Got string response: " << boost::get<std::string>(response) << std::endl;
@@ -51,7 +51,7 @@ void expect_string_result(future_response &n_response) {
 
 void expect_string_result(future_response &n_response, const std::string &n_expected_string) {
 
-	RESPonse response = n_response.get();
+	RedisMessage response = n_response.get();
 
 	if (response.which() == 1) {
 		if (boost::get<std::string>(response) != n_expected_string) {
@@ -65,7 +65,7 @@ void expect_string_result(future_response &n_response, const std::string &n_expe
 
 void expect_null_result(future_response &n_response) {
 
-	RESPonse response = n_response.get();
+	RedisMessage response = n_response.get();
 
 	if (response.which() == 3) {
 		std::cout << "Got expected null response" << std::endl;
@@ -84,7 +84,7 @@ void test_binary_get() {
 	client.set("myval:437!:bin_test_key", binary_sample);
 
 	future_response sr1 = client.get("myval:437!:bin_test_key");
-	RESPonse br1 = sr1.get();
+	RedisMessage br1 = sr1.get();
 
 	// I expect the response to be a string containing the same binary value
 	if (br1.which() != 1) {
@@ -118,8 +118,33 @@ void test_lua() {
 
 	// get the binary string back using regular get and expect to be same
 	expect_string_result(client.get(std::string("Hel\r\nlo", 7)), std::string("W\0rld", 5));
-		
+	
+
+	// a little more complex script that increases a number of seats and occupies one if available
+	client.set("used_seats", "3");
+
+	const std::string add_seat(
+		"local used_seats = redis.call('get', 'used_seats') \r\n"
+		"if used_seats < 4 then                             \r\n"
+		"    redis.call('incr', 'used_seats')               \r\n"
+		"    redis.call('set', KEYS[1], ARGV[1])            \r\n"
+		"    return 'OK'                                    \r\n"
+		"else                                               \r\n"
+		"    return nil                                     \r\n"
+		"end"
+	);
+
+	// This should work once
+	expect_string_result(client.eval(add_seat, LuaArgument("seat4", "Moose")), "OK");
+
+	// But not again
+	expect_null_result(client.eval(add_seat, LuaArgument("seat5", "PoorBugger")));
+
+	// Because all seats are used
+	//expect_int_result(client.eval(add_seat, LuaArgument("seat5", "PoorBugger")));
+
 	// cleanup
+	client.del("seat4");
 	client.del(std::string("Hel\r\nlo", 7));
 	client.del("foo");
 }
@@ -206,7 +231,7 @@ void test_hincr_by() {
 	output_int_result(fr14);
 
 	client.hset("myhash", "testfield", "moep");
-	client.hget("myhash", "testfield", [] (const RESPonse &n_response) {
+	client.hget("myhash", "testfield", [] (const RedisMessage &n_response) {
 
 		// I expect the response to be a string containing a simple date time format
 		if (n_response.which() != 1) {

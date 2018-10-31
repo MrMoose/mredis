@@ -28,7 +28,7 @@ BOOST_AUTO_TEST_CASE(Pong) {
 	}
 
 	std::istream is(&sb);
-	RESPonse r = parse_one(is);
+	RedisMessage r = parse_one(is);
 
 	BOOST_CHECK(r.which() == 1);
 	BOOST_CHECK(boost::get<std::string>(r) == "PONG");
@@ -45,7 +45,7 @@ BOOST_AUTO_TEST_CASE(Error) {
 	}
 
 	std::istream is(&sb);
-	RESPonse r = parse_one(is);
+	RedisMessage r = parse_one(is);
 
 	BOOST_CHECK(r.which() == 0);
 
@@ -68,12 +68,12 @@ BOOST_AUTO_TEST_CASE(Array) {
 	}
 
 	std::istream is(&sb);
-	RESPonse r;
+	RedisMessage r;
 	BOOST_CHECK(parse_from_stream(is, r));
 
 	BOOST_CHECK(r.which() == 4);
 
-	const std::vector<RESPonse> results = boost::get<std::vector<RESPonse>>(r);
+	const std::vector<RedisMessage> results = boost::get<std::vector<RedisMessage> >(r);
 
 	BOOST_CHECK(results.size() == 3);
 	BOOST_CHECK(results[0].which() == 1);
@@ -96,30 +96,42 @@ BOOST_AUTO_TEST_CASE(Null) {
 	}
 
 	std::istream is(&sb);
-	RESPonse r;
+	RedisMessage r;
 	BOOST_CHECK(parse_from_stream(is, r));
 
 	BOOST_REQUIRE(r.which() == 3);
 }
 
+bool require_bulk_string(const RedisMessage &n_message, const std::string &n_value) {
+	
+	if (n_message.which() != 1) {
+		return false;
+	}
+
+	if (n_value != boost::get<std::string>(n_message)) {
+		return false;
+	}
+
+	return true;
+}
+
 BOOST_AUTO_TEST_CASE(Bulk) {
 
 	boost::asio::streambuf sb;
+	std::string sample("$5\r\nH\0llo\r\n", 11);
 
 	{
-		std::ostream os(&sb);
-		os.write("$5\r\nH\0llo\r\n", 11);  //  Basically "Hello" but with the 'e' replaced by null
+		// serialize the sample
+		std::ostream os(&sb, std::ostream::binary);
+		BOOST_CHECK_NO_THROW(generate_to_stream(os, sample));
 	}
-
-	std::istream is(&sb);
-	RESPonse r;
-	BOOST_CHECK(parse_from_stream(is, r));
-
-	BOOST_REQUIRE(r.which() == 1);
-
-	const std::string result = boost::get<std::string>(r);
-
-	BOOST_CHECK(result.size() == 5);
+	{
+		// and read it back in
+		std::istream is(&sb, std::istream::binary);
+		RedisMessage msg;
+		BOOST_REQUIRE(parse_from_stream(is, msg));
+		BOOST_CHECK(require_bulk_string(msg, sample));
+	}
 }
 
 BOOST_AUTO_TEST_CASE(NullString) {
@@ -131,7 +143,7 @@ BOOST_AUTO_TEST_CASE(NullString) {
 	}
 
 	std::istream is(&sb);
-	RESPonse r;
+	RedisMessage r;
 	BOOST_CHECK(parse_from_stream(is, r));
 
 	BOOST_CHECK(r.which() == 1);
@@ -140,4 +152,42 @@ BOOST_AUTO_TEST_CASE(NullString) {
 
 	BOOST_CHECK(result.size() == 0);
 	BOOST_CHECK(result.empty());
+}
+
+BOOST_AUTO_TEST_CASE(ArraySerialize) {
+
+	boost::asio::streambuf sb;
+
+	// Assemble an array of assorted values
+	std::vector<RedisMessage> arr;
+	
+	arr.push_back("Hello World");
+	arr.push_back(null_result());
+	arr.push_back(42);
+	arr.push_back(std::string("Test C\0mplete", 13));
+
+	{
+		// serialize the array
+		std::ostream os(&sb, std::ostream::binary);
+		BOOST_CHECK_NO_THROW(generate_to_stream(os, arr));
+	}
+	{
+		// and read it back in
+		std::istream is(&sb, std::istream::binary);
+		RedisMessage msg;
+		BOOST_REQUIRE(parse_from_stream(is, msg));
+
+		BOOST_REQUIRE(msg.which() == 4);
+		const std::vector<RedisMessage> res = boost::get<std::vector<RedisMessage> >(msg);
+
+		BOOST_CHECK(res.size() == 4);
+		BOOST_CHECK(res[0].which() == 1);
+		BOOST_CHECK(res[1].which() == 3);
+		BOOST_CHECK(res[2].which() == 2);
+		BOOST_CHECK(res[3].which() == 1);
+
+		BOOST_CHECK(boost::get<std::string>(res[0]) == "Hello World");
+		BOOST_CHECK(boost::get<boost::int64_t>(res[2]) == 42);
+		BOOST_CHECK(boost::get<std::string>(res[3]) == std::string("Test C\0mplete", 13));
+	}
 }

@@ -5,6 +5,7 @@
 
 #include "MRedisPubsubConnection.hpp"
 #include "AsyncClient.hpp"
+#include "MRedisCommands.hpp"
 
 #include "tools/Log.hpp"
 #include "tools/Assert.hpp"
@@ -302,7 +303,7 @@ class MessageVisitor : public boost::static_visitor<> {
 		BOOST_LOG_SEV(logger(), error) << "Received null message, while expecting an array";
 	}
 
-	void operator()(const std::vector<RESPonse> &n_array) const {
+	void operator()(const std::vector<RedisMessage> &n_array) const {
 
 		// From the redis specs:
 		// A message is a Array reply with three elements.
@@ -482,7 +483,7 @@ void MRedisPubsubConnection::read_message() {
 		while (m_streambuf.size()) {
 
 			std::istream is(&m_streambuf);
-			RESPonse r;
+			RedisMessage r;
 
 			// As long as we can parse messages from our stream, continue to do so.
 			bool success = parse_from_stream(is, r);

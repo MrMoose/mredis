@@ -121,7 +121,7 @@ class EasyPublisherThread {
 					// Sometimes I wait for the response, sometimes not
 					if (urand(1) == 1) {
 						// wait for the response
-						RESPonse res = r.get();
+						RedisMessage res = r.get();
 
 						if (res.which() != 2) {
 							m_error.store(true);

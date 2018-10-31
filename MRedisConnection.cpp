@@ -5,7 +5,7 @@
 
 #include "MRedisConnection.hpp"
 #include "AsyncClient.hpp"
-#include "RESP.hpp"
+#include "MRedisCommands.hpp"
 
 #include "tools/Log.hpp"
 #include "tools/Assert.hpp"
@@ -67,11 +67,11 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 
 			// send a ping to say hello. Only one ping though, Vassily
 			{
-				std::ostream os(&m_streambuf);
+				std::ostream os(&m_streambuf, std::ostream::binary);
 				format_ping(os);
 			}
 
-			m_outstanding.emplace_back([this, promise](const RESPonse &n_response) {
+			m_outstanding.emplace_back([this, promise](const RedisMessage &n_response) {
 				promise->set_value(n_response);
 			});
 
@@ -88,7 +88,7 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 			});
 	});
 
-	RESPonse r = res.get();
+	RedisMessage r = res.get();
 
 	if (r.which() != 1) {
 		BOOST_LOG_SEV(logger(), error) << "Server did not pong";
@@ -145,7 +145,7 @@ void MRedisConnection::async_connect(const std::string &n_server, const boost::u
 			}
 
 			// Put a callback into the expected responses queue to know what we do when ping returns
-			m_outstanding.emplace_back([this, n_ret, start](const RESPonse &n_response) {
+			m_outstanding.emplace_back([this, n_ret, start](const RedisMessage &n_response) {
 
 				if (n_response.which() == 0) {
 					n_ret->set_exception(boost::get<redis_error>(n_response));
@@ -227,7 +227,7 @@ promised_response_ptr MRedisConnection::send(std::function<void(std::ostream &n_
 		
 		mrequest req{ std::move(n_prepare),
 
-			[promise](const RESPonse &n_response) {
+			[promise](const RedisMessage &n_response) {
 
 				if (n_response.which() == 0) {
 					promise->set_exception(boost::get<redis_error>(n_response));
@@ -429,7 +429,7 @@ void MRedisConnection::read_response() noexcept {
 		while (m_outstanding.size() && m_streambuf.size()) {
 		
 			std::istream is(&m_streambuf);
-			RESPonse r;
+			RedisMessage r;
 				
 			// As long as we can parse messages from our stream, continue to do so.
 			bool success = parse_from_stream(is, r);

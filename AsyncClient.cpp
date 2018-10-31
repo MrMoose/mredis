@@ -4,6 +4,7 @@
 //  LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 #include "AsyncClient.hpp"
+#include "MRedisCommands.hpp"
 #include "MRedisConnection.hpp"
 #include "MRedisPubsubConnection.hpp"
 #include "MRedisError.hpp"

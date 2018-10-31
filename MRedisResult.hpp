@@ -26,10 +26,10 @@ typedef boost::make_recursive_variant<
 	boost::int64_t,                        // 2 integer response
 	null_result,                           // 3 null response
 	std::vector<boost::recursive_variant_> // 4 arrays
->::type RESPonse;
+>::type RedisMessage;
 
 //! callback for all kinds of responses
-typedef std::function<void(const RESPonse &)> Callback;
+typedef std::function<void(const RedisMessage &)> Callback;
 
 //! the way I understand the protocol, payload to a message published is always a string
 typedef std::function<void(const std::string &)> MessageCallback;
@@ -40,9 +40,9 @@ struct mrequest {
 	Callback                                m_callback;
 };
 
-typedef boost::future<RESPonse>              future_response;
+typedef boost::future<RedisMessage>              future_response;
 
-typedef boost::promise<RESPonse>             promised_response;
+typedef boost::promise<RedisMessage>             promised_response;
 typedef boost::shared_ptr<promised_response> promised_response_ptr;
 
 }

@@ -18,5 +18,14 @@ void redis_error::set_server_message(const std::string &n_message) {
 	*this << redis_server_message(n_message);
 }
 
+std::string redis_error::server_message() const noexcept {
+
+	if (std::string const *m = boost::get_error_info<redis_server_message>(*this)) {
+		return *m;
+	} else {
+		return "redis error";
+	}
+}
+
 }
 }
