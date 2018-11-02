@@ -139,13 +139,15 @@ void test_lua() {
 	// This should work once
 	expect_string_result(client.eval(add_seat, LuaArgument("seat4", "Moose")), "OK");
 
-	// But not again
+	// But not again because all seats are used
 	expect_null_result(client.eval(add_seat, LuaArgument("seat5", "PoorBugger")));
 
-	// Because all seats are used
-	//expect_int_result(client.eval(add_seat, LuaArgument("seat5", "PoorBugger")));
+	// Which means, we only have entry one
+	expect_string_result(client.get("seat4"), "Moose");
+	expect_null_result(client.get("seat5"));
 
 	// cleanup
+	client.del("used_seats");
 	client.del("seat4");
 	client.del(std::string("Hel\r\nlo", 7));
 	client.del("foo");
