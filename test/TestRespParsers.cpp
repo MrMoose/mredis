@@ -122,12 +122,12 @@ BOOST_AUTO_TEST_CASE(Bulk) {
 
 	{
 		// serialize the sample
-		std::ostream os(&sb, std::ostream::binary);
+		std::ostream os(&sb);
 		BOOST_CHECK_NO_THROW(generate_to_stream(os, sample));
 	}
 	{
 		// and read it back in
-		std::istream is(&sb, std::istream::binary);
+		std::istream is(&sb);
 		RedisMessage msg;
 		BOOST_REQUIRE(parse_from_stream(is, msg));
 		BOOST_CHECK(require_bulk_string(msg, sample));
@@ -168,12 +168,12 @@ BOOST_AUTO_TEST_CASE(ArraySerialize) {
 
 	{
 		// serialize the array
-		std::ostream os(&sb, std::ostream::binary);
+		std::ostream os(&sb);
 		BOOST_CHECK_NO_THROW(generate_to_stream(os, arr));
 	}
 	{
 		// and read it back in
-		std::istream is(&sb, std::istream::binary);
+		std::istream is(&sb);
 		RedisMessage msg;
 		BOOST_REQUIRE(parse_from_stream(is, msg));
 
@@ -191,3 +191,4 @@ BOOST_AUTO_TEST_CASE(ArraySerialize) {
 		BOOST_CHECK(boost::get<std::string>(res[3]) == std::string("Test C\0mplete", 13));
 	}
 }
+

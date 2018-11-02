@@ -27,7 +27,7 @@ using namespace moose::tools;
 
 std::string server_ip_string;
 
-void output_int_result(future_response &n_response) {
+void output_int_result(future_response &&n_response) {
 
 	RedisMessage response = n_response.get();
 
@@ -38,7 +38,7 @@ void output_int_result(future_response &n_response) {
 	};
 }
 
-void expect_string_result(future_response &n_response) {
+void expect_string_result(future_response &&n_response) {
 
 	RedisMessage response = n_response.get();
 
@@ -49,7 +49,7 @@ void expect_string_result(future_response &n_response) {
 	};
 }
 
-void expect_string_result(future_response &n_response, const std::string &n_expected_string) {
+void expect_string_result(future_response &&n_response, const std::string &n_expected_string) {
 
 	RedisMessage response = n_response.get();
 
@@ -63,7 +63,7 @@ void expect_string_result(future_response &n_response, const std::string &n_expe
 	};
 }
 
-void expect_null_result(future_response &n_response) {
+void expect_null_result(future_response &&n_response) {
 
 	RedisMessage response = n_response.get();
 
@@ -196,41 +196,25 @@ void test_hincr_by() {
 	AsyncClient client(server_ip_string);
 	client.connect();
 
-	future_response fr1 = client.hincrby("myhash", "field", 1);
-	future_response fr2 = client.hincrby("myhash", "field", 1);
-	future_response fr3 = client.hincrby("myhash", "field", 1);
-	future_response fr4 = client.hincrby("myhash", "field", 1);
-	future_response fr5 = client.hincrby("myhash", "field", 1);
-	future_response fr6 = client.hincrby("myhash", "field", 1);
-	future_response fr7 = client.hincrby("myhash", "field", 1);
-
-	output_int_result(fr1);
-	output_int_result(fr2);
-	output_int_result(fr3);
-	output_int_result(fr4);
-	output_int_result(fr5);
-	output_int_result(fr6);
-	output_int_result(fr7);
+	output_int_result(client.hincrby("myhash", "field", 1));
+	output_int_result(client.hincrby("myhash", "field", 1));
+	output_int_result(client.hincrby("myhash", "field", 1));
+	output_int_result(client.hincrby("myhash", "field", 1));
+	output_int_result(client.hincrby("myhash", "field", 1));
+	output_int_result(client.hincrby("myhash", "field", 1));
+	output_int_result(client.hincrby("myhash", "field", 1));
 
 	std::cout << "Wait a sec... " << std::endl;
-	boost::this_thread::sleep_for(boost::chrono::seconds(1));
+	boost::this_thread::sleep_for(boost::chrono::milliseconds(200));
 	std::cout << "Again!" << std::endl;
 
-	future_response fr8 = client.hincrby("myhash", "field", 1);
-	future_response fr9 = client.hincrby("myhash", "field", 1);
-	future_response fr10 = client.hincrby("myhash", "field", 1);
-	future_response fr11 = client.hincrby("myhash", "field", 1);
-	future_response fr12 = client.hincrby("myhash", "field", 1);
-	future_response fr13 = client.hincrby("myhash", "field", 1);
-	future_response fr14 = client.hincrby("myhash", "field", 1);
-
-	output_int_result(fr8);
-	output_int_result(fr9);
-	output_int_result(fr10);
-	output_int_result(fr11);
-	output_int_result(fr12);
-	output_int_result(fr13);
-	output_int_result(fr14);
+	output_int_result(client.hincrby("myhash", "field", 1));
+	output_int_result(client.hincrby("myhash", "field", 1));
+	output_int_result(client.hincrby("myhash", "field", 1));
+	output_int_result(client.hincrby("myhash", "field", 1));
+	output_int_result(client.hincrby("myhash", "field", 1));
+	output_int_result(client.hincrby("myhash", "field", 1));
+	output_int_result(client.hincrby("myhash", "field", 1));
 
 	client.hset("myhash", "testfield", "moep");
 	client.hget("myhash", "testfield", [] (const RedisMessage &n_response) {
@@ -250,6 +234,7 @@ void test_hincr_by() {
 	
 	// cleanup
 	client.del("myval:437!:test_key");
+	client.del("myhash");
 }
 
 

@@ -67,7 +67,11 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 
 			// send a ping to say hello. Only one ping though, Vassily
 			{
+#ifdef _WIN32
 				std::ostream os(&m_streambuf, std::ostream::binary);
+#else
+				std::ostream os(&m_streambuf);
+#endif
 				format_ping(os);
 			}
 
@@ -282,7 +286,11 @@ void MRedisConnection::send_command_orig(std::function<void(std::ostream &n_os)>
 		m_buffer_busy = true;
 
 		{
+#ifdef _WIN32
 			std::ostream os(&m_streambuf, std::ostream::binary);
+#else
+			std::ostream os(&m_streambuf);
+#endif
 
 			// See if we have unsent requests and stream them first in the order they came in
 			for (mrequest &req : m_requests_not_sent) {
@@ -350,7 +358,11 @@ void MRedisConnection::send_outstanding_requests() noexcept {
 		m_buffer_busy = true;
 
 		{
+#ifdef _WIN32
 			std::ostream os(&m_streambuf, std::ostream::binary);
+#else
+			std::ostream os(&m_streambuf);
+#endif
 
 //			BOOST_LOG_SEV(logger(), debug) << "Sending " << m_requests_not_sent.size() << " outstanding requests";
 			
