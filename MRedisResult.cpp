@@ -5,6 +5,12 @@
 
 #include "MRedisResult.hpp"
 
+namespace moose {
+namespace mredis {
+
 #if defined(BOOST_MSVC)
 void MRedisResultgetRidOfLNK4221() {}
 #endif
+
+}
+}

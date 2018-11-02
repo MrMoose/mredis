@@ -94,7 +94,7 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 
 	RedisMessage r = res.get();
 
-	if (r.which() != 1) {
+	if (!is_string(r)) {
 		BOOST_LOG_SEV(logger(), error) << "Server did not pong";
 		stop();
 		BOOST_THROW_EXCEPTION(network_error() << error_message("Server did not respond to ping"));
@@ -151,12 +151,12 @@ void MRedisConnection::async_connect(const std::string &n_server, const boost::u
 			// Put a callback into the expected responses queue to know what we do when ping returns
 			m_outstanding.emplace_back([this, n_ret, start](const RedisMessage &n_response) {
 
-				if (n_response.which() == 0) {
+				if (is_error(n_response)) {
 					n_ret->set_exception(boost::get<redis_error>(n_response));
 					return;
 				}
 
-				if (n_response.which() != 1 || !boost::algorithm::equals(boost::get<std::string>(n_response), "PONG")) {
+				if (!is_string(n_response) || !boost::algorithm::equals(boost::get<std::string>(n_response), "PONG")) {
 					n_ret->set_exception(redis_error() << error_message("Server did not pong"));
 					return;
 				}
@@ -233,7 +233,7 @@ promised_response_ptr MRedisConnection::send(std::function<void(std::ostream &n_
 
 			[promise](const RedisMessage &n_response) {
 
-				if (n_response.which() == 0) {
+				if (is_error(n_response)) {
 					promise->set_exception(boost::get<redis_error>(n_response));
 				} else {
 					promise->set_value(n_response);

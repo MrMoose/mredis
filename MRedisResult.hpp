@@ -28,6 +28,33 @@ typedef boost::make_recursive_variant<
 	std::vector<boost::recursive_variant_> // 4 arrays
 >::type RedisMessage;
 
+//! convenience type check so you don't have to fuck around with magic numbers like which() does
+inline bool is_error(const RedisMessage &n_message) noexcept {
+
+	return n_message.which() == 0;
+}
+
+//! convenience type check so you don't have to fuck around with magic numbers like which() does
+inline bool is_string(const RedisMessage &n_message) noexcept {
+
+	return n_message.which() == 1;
+}
+
+inline bool is_int(const RedisMessage &n_message) noexcept {
+
+	return n_message.which() == 2;
+}
+
+inline bool is_null(const RedisMessage &n_message) noexcept {
+
+	return n_message.which() == 3;
+}
+
+inline bool is_array(const RedisMessage &n_message) noexcept {
+
+	return n_message.which() == 4;
+}
+
 //! callback for all kinds of responses
 typedef std::function<void(const RedisMessage &)> Callback;
 
@@ -45,9 +72,9 @@ typedef boost::future<RedisMessage>              future_response;
 typedef boost::promise<RedisMessage>             promised_response;
 typedef boost::shared_ptr<promised_response> promised_response_ptr;
 
-}
-}
-
 #if defined(BOOST_MSVC)
 MREDIS_API void MRedisResultgetRidOfLNK4221();
 #endif
+
+}
+}

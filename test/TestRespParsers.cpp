@@ -30,7 +30,7 @@ BOOST_AUTO_TEST_CASE(Pong) {
 	std::istream is(&sb);
 	RedisMessage r = parse_one(is);
 
-	BOOST_CHECK(r.which() == 1);
+	BOOST_CHECK(is_string(r));
 	BOOST_CHECK(boost::get<std::string>(r) == "PONG");
 }
 
@@ -47,7 +47,7 @@ BOOST_AUTO_TEST_CASE(Error) {
 	std::istream is(&sb);
 	RedisMessage r = parse_one(is);
 
-	BOOST_CHECK(r.which() == 0);
+	BOOST_CHECK(is_error(r));
 
 	redis_error e = boost::get<redis_error>(r);
 
@@ -71,14 +71,14 @@ BOOST_AUTO_TEST_CASE(Array) {
 	RedisMessage r;
 	BOOST_CHECK(parse_from_stream(is, r));
 
-	BOOST_CHECK(r.which() == 4);
+	BOOST_CHECK(is_array(r));
 
 	const std::vector<RedisMessage> results = boost::get<std::vector<RedisMessage> >(r);
 
 	BOOST_CHECK(results.size() == 3);
-	BOOST_CHECK(results[0].which() == 1);
-	BOOST_CHECK(results[1].which() == 2);
-	BOOST_CHECK(results[2].which() == 1);
+	BOOST_CHECK(is_string(results[0]));
+	BOOST_CHECK(is_int(results[1]));
+	BOOST_CHECK(is_string(results[2]));
 
 	BOOST_CHECK(boost::get<std::string>(results[0]) == "String");
 	BOOST_CHECK(boost::get<boost::int64_t>(results[1]) == 42);
@@ -99,12 +99,12 @@ BOOST_AUTO_TEST_CASE(Null) {
 	RedisMessage r;
 	BOOST_CHECK(parse_from_stream(is, r));
 
-	BOOST_REQUIRE(r.which() == 3);
+	BOOST_CHECK(is_null(r));
 }
 
 bool require_bulk_string(const RedisMessage &n_message, const std::string &n_value) {
 	
-	if (n_message.which() != 1) {
+	if (!is_string(n_message)) {
 		return false;
 	}
 
@@ -146,7 +146,7 @@ BOOST_AUTO_TEST_CASE(NullString) {
 	RedisMessage r;
 	BOOST_CHECK(parse_from_stream(is, r));
 
-	BOOST_CHECK(r.which() == 1);
+	BOOST_CHECK(is_string(r));
 
 	const std::string result = boost::get<std::string>(r);
 
@@ -177,14 +177,14 @@ BOOST_AUTO_TEST_CASE(ArraySerialize) {
 		RedisMessage msg;
 		BOOST_REQUIRE(parse_from_stream(is, msg));
 
-		BOOST_REQUIRE(msg.which() == 4);
+		BOOST_REQUIRE(is_array(msg));
 		const std::vector<RedisMessage> res = boost::get<std::vector<RedisMessage> >(msg);
 
 		BOOST_CHECK(res.size() == 4);
-		BOOST_CHECK(res[0].which() == 1);
-		BOOST_CHECK(res[1].which() == 3);
-		BOOST_CHECK(res[2].which() == 2);
-		BOOST_CHECK(res[3].which() == 1);
+		BOOST_CHECK(is_string(res[0]));
+		BOOST_CHECK(is_null(res[1]));
+		BOOST_CHECK(is_int(res[2]));
+		BOOST_CHECK(is_string(res[3]));
 
 		BOOST_CHECK(boost::get<std::string>(res[0]) == "Hello World");
 		BOOST_CHECK(boost::get<boost::int64_t>(res[2]) == 42);

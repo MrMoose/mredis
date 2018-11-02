@@ -327,7 +327,7 @@ class MessageVisitor : public boost::static_visitor<> {
 		}
 
 		// first element must be a string
-		if (n_array[0].which() != 1) {
+		if (!is_string(n_array[0])) {
 			BOOST_LOG_SEV(logger(), error) << "First message element is not a string: " << n_array[0].which();
 			return;
 		}
@@ -336,7 +336,7 @@ class MessageVisitor : public boost::static_visitor<> {
 
 		if (boost::algorithm::equals(msgstr, "message")) {
 
-			if (n_array[1].which() != 1) {
+			if (!is_string(n_array[1])) {
 				BOOST_LOG_SEV(logger(), error) << "Second message element is not a string: " << n_array[1].which();
 				return;
 			}
@@ -375,7 +375,7 @@ class MessageVisitor : public boost::static_visitor<> {
 
 		} else if (boost::algorithm::equals(msgstr, "subscribe")) {
 
-			if (n_array[1].which() != 1) {
+			if (!is_string(n_array[1])) {
 				BOOST_LOG_SEV(logger(), error) << "Second subscribe message element is not a string: " << n_array[1].which();
 				return;
 			}
@@ -407,7 +407,7 @@ class MessageVisitor : public boost::static_visitor<> {
 
 		} else if (boost::algorithm::equals(msgstr, "unsubscribe")) {
 
-			if (n_array[1].which() != 1) {
+			if (!is_string(n_array[1])) {
 				BOOST_LOG_SEV(logger(), error) << "Second unsubscribe message element is not a string: " << n_array[1].which();
 				return;
 			}

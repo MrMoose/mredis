@@ -123,7 +123,7 @@ class EasyPublisherThread {
 						// wait for the response
 						RedisMessage res = r.get();
 
-						if (res.which() != 2) {
+						if (!is_int(res)) {
 							m_error.store(true);
 							std::cerr << "Response to publish is not an int: " << res.which() << std::endl;
 							return;

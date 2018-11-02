@@ -31,7 +31,7 @@ void output_int_result(future_response &&n_response) {
 
 	RedisMessage response = n_response.get();
 
-	if (response.which() == 2) {
+	if (is_int(response)) {
 		std::cout << "Response: " << boost::get<boost::int64_t>(response) << std::endl;
 	} else {
 		std::cerr << "Unexpected response: " << response.which() << std::endl;
@@ -42,8 +42,20 @@ void expect_string_result(future_response &&n_response) {
 
 	RedisMessage response = n_response.get();
 
-	if (response.which() == 1) {
+	if (is_string(response)) {
 		std::cout << "Got string response: " << boost::get<std::string>(response) << std::endl;
+	} else {
+		BOOST_THROW_EXCEPTION(redis_error() << error_message("Not a string response"));
+	};
+}
+
+void expect_string_result(const RedisMessage &n_response, const std::string &n_expected_string) {
+
+	if (is_string(n_response)) {
+		if (boost::get<std::string>(n_response) != n_expected_string) {
+			BOOST_THROW_EXCEPTION(redis_error() << error_message("Unexpected string response")
+				<< error_argument(boost::get<std::string>(n_response)));
+		}
 	} else {
 		BOOST_THROW_EXCEPTION(redis_error() << error_message("Not a string response"));
 	};
@@ -52,22 +64,14 @@ void expect_string_result(future_response &&n_response) {
 void expect_string_result(future_response &&n_response, const std::string &n_expected_string) {
 
 	RedisMessage response = n_response.get();
-
-	if (response.which() == 1) {
-		if (boost::get<std::string>(response) != n_expected_string) {
-			BOOST_THROW_EXCEPTION(redis_error() << error_message("Unexpected string response")
-					<< error_argument(boost::get<std::string>(response)));
-		}
-	} else {
-		BOOST_THROW_EXCEPTION(redis_error() << error_message("Not a string response"));
-	};
+	expect_string_result(response, n_expected_string);
 }
 
 void expect_null_result(future_response &&n_response) {
 
 	RedisMessage response = n_response.get();
 
-	if (response.which() == 3) {
+	if (is_null(response)) {
 		std::cout << "Got expected null response" << std::endl;
 	} else {
 		BOOST_THROW_EXCEPTION(redis_error() << error_message("Not a null response"));
@@ -87,7 +91,7 @@ void test_binary_get() {
 	RedisMessage br1 = sr1.get();
 
 	// I expect the response to be a string containing the same binary value
-	if (br1.which() != 1) {
+	if (!is_string(br1)) {
 		std::cerr << "not a string response: " << br1.which() << std::endl;
 	} else {
 		if (binary_sample != boost::get<std::string>(br1)) {
@@ -221,12 +225,7 @@ void test_hincr_by() {
 	client.hset("myhash", "testfield", "moep");
 	client.hget("myhash", "testfield", [] (const RedisMessage &n_response) {
 
-		// I expect the response to be a string containing a simple date time format
-		if (n_response.which() != 1) {
-			std::cerr << "not a string response: " << n_response.which();
-		} else {
-			std::cout << "Response: " << boost::get<std::string>(n_response) << std::endl;
-		}
+		expect_string_result(n_response, "moep");
 	});
 
 	boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
