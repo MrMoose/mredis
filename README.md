@@ -106,9 +106,6 @@ if (is_string(msg)) {
 
 Giving in lambdas can be more elaborate and complex.
 
-future_response sr1 = client.get("myval:437!:bin_test_key");
-	RedisMessage br1 = sr1.get();
-
 ```
 #include "mredis/AsyncClient.hpp"
 
