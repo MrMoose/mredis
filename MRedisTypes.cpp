@@ -8,11 +8,9 @@
 namespace moose {
 namespace mredis {
 
-LuaArgument::LuaArgument(std::string &&n_key, std::string &&n_value)
-		: m_key(n_key)
-		, m_value(n_value) {
-
-}
+#if defined(BOOST_MSVC)
+void MredisTypesGetRidOfLNK4221() {}
+#endif
 
 }
 }

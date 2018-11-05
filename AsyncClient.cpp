@@ -331,7 +331,7 @@ void AsyncClient::eval(const std::string &n_script, Callback &&n_callback) noexc
 	MOOSE_ASSERT(d().m_main_connection);
 
 	d().m_main_connection->send(
-			[=] (std::ostream &n_os) { format_eval(n_os, n_script, std::vector<LuaArgument>()); }
+			[=] (std::ostream &n_os) { format_eval(n_os, n_script, std::vector<std::string>(), std::vector<std::string>()); }
 			, std::move(n_callback));
 }
 
@@ -339,45 +339,46 @@ future_response AsyncClient::eval(const std::string &n_script) noexcept {
 	
 	MOOSE_ASSERT(d().m_main_connection);
 
-	return d().m_main_connection->send([=] (std::ostream &n_os) { format_eval(n_os, n_script, std::vector<LuaArgument>()); })->get_future();
+	return d().m_main_connection->send([=] (std::ostream &n_os) {
+		format_eval(n_os, n_script, std::vector<std::string>(), std::vector<std::string>()); })->get_future();
 }
 
-void AsyncClient::eval(const std::string &n_script, const LuaArgument &n_arg, Callback &&n_callback) noexcept {
+void AsyncClient::eval(const std::string &n_script, const std::vector<std::string> &n_args, Callback &&n_callback) noexcept {
 	
 	MOOSE_ASSERT(d().m_main_connection);
 
-	std::vector<LuaArgument> v;
-	v.emplace_back(n_arg);
+	std::vector<std::string> keys;
 
 	d().m_main_connection->send(
-			[=] (std::ostream &n_os) { format_eval(n_os, n_script, v); }
+			[=] (std::ostream &n_os) { format_eval(n_os, n_script, keys, n_args); }
 			, std::move(n_callback));
 }
 
-future_response AsyncClient::eval(const std::string &n_script, const LuaArgument &n_arg) noexcept {
+future_response AsyncClient::eval(const std::string &n_script, const std::vector<std::string> &n_args) noexcept {
 	
 	MOOSE_ASSERT(d().m_main_connection);
 
-	std::vector<LuaArgument> v;
-	v.emplace_back(n_arg);
+	std::vector<std::string> keys;
 
-	return d().m_main_connection->send([=] (std::ostream &n_os) { format_eval(n_os, n_script, v); })->get_future();
+	return d().m_main_connection->send([=] (std::ostream &n_os) { format_eval(n_os, n_script, keys, n_args); })->get_future();
 }
 
-void AsyncClient::eval(const std::string &n_script, const std::vector<LuaArgument> &n_args, Callback &&n_callback) noexcept {
+void AsyncClient::eval(const std::string &n_script, const std::vector<std::string> &n_keys,
+		const std::vector<std::string> &n_args, Callback &&n_callback) noexcept {
 	
 	MOOSE_ASSERT(d().m_main_connection);
 
 	d().m_main_connection->send(
-			[=] (std::ostream &n_os) { format_eval(n_os, n_script, n_args); }
+			[=] (std::ostream &n_os) { format_eval(n_os, n_script, n_keys, n_args); }
 			, std::move(n_callback));
 }
 
-future_response AsyncClient::eval(const std::string &n_script, const std::vector<LuaArgument> &n_args) noexcept {
+future_response AsyncClient::eval(const std::string &n_script, const std::vector<std::string> &n_keys,
+		const std::vector<std::string> &n_args) noexcept {
 
 	MOOSE_ASSERT(d().m_main_connection);
 
-	return d().m_main_connection->send([=] (std::ostream &n_os) { format_eval(n_os, n_script, n_args); })->get_future();
+	return d().m_main_connection->send([=] (std::ostream &n_os) { format_eval(n_os, n_script, n_keys, n_args); })->get_future();
 }
 
 boost::uint64_t AsyncClient::subscribe(const std::string &n_channel_name, MessageCallback &&n_callback) {

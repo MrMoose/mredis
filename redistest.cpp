@@ -109,20 +109,28 @@ void test_lua() {
 
 	// Very simple set
 	expect_string_result(
-		client.eval("return redis.call('set', 'foo', 'bar')", std::vector<LuaArgument>()),
+		client.eval("return redis.call('set', 'foo', 'bar')"),
 		"OK"
 	);
 
+	// to be used many times
+	std::vector<std::string> keys;
+	std::vector<std::string> args;
+
 	// Set with binary arguments
-	LuaArgument arg1(std::string("Hel\r\nlo", 7), std::string("W\0rld", 5));
+	keys.emplace_back(std::string("Hel\r\nlo", 7));
+	args.emplace_back(std::string("W\0rld", 5));
+
 	expect_string_result(
-		client.eval("return redis.call('set', KEYS[1], ARGV[1])", arg1),
+		client.eval("return redis.call('set', KEYS[1], ARGV[1])", keys, args),
 		"OK"
 	);
 
 	// get the binary string back using regular get and expect to be same
 	expect_string_result(client.get(std::string("Hel\r\nlo", 7)), std::string("W\0rld", 5));
 	
+	keys.clear();
+	args.clear();
 
 	// a little more complex script that increases a number of seats and occupies one if available
 	client.set("used_seats", "3");
@@ -130,21 +138,29 @@ void test_lua() {
 	const std::string add_seat( // It appears as if everything is type-less stored as string. 
 		                        // In order to make Lua know I intend to treat it as a number, I have
 		                        // to explicitly use tonumber()
-		"local used_seats = tonumber(redis.call('get', 'used_seats'))"
-		"if used_seats < 4 then                                      "
-		"    redis.call('incr', 'used_seats')                        "
-		"    redis.call('set', KEYS[1], ARGV[1])                     "
-		"    return 'OK'                                             "
-		"else                                                        "
-		"    return nil                                              "
+		"local used_seats = tonumber(redis.call('get', KEYS[1])) "
+		"if used_seats < 4 then                                  "
+		"    redis.call('incr', KEYS[1])                         "
+		"    redis.call('set', KEYS[2], ARGV[1])                 "
+		"    return 'OK'                                         "
+		"else                                                    "
+		"    return nil                                          "
 		"end"
 	);
 
+	keys.emplace_back("used_seats");
+	keys.emplace_back("seat4");
+
+	args.emplace_back("Moose");
+
 	// This should work once
-	expect_string_result(client.eval(add_seat, LuaArgument("seat4", "Moose")), "OK");
+	expect_string_result(client.eval(add_seat, keys, args), "OK");
+
+	keys[1] = "seat5";
+	args[0] = "PoorBugger";
 
 	// But not again because all seats are used
-	expect_null_result(client.eval(add_seat, LuaArgument("seat5", "PoorBugger")));
+	expect_null_result(client.eval(add_seat, keys, args));
 
 	// Which means, we only have entry one
 	expect_string_result(client.get("seat4"), "Moose");

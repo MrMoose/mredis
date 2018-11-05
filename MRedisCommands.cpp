@@ -154,7 +154,7 @@ void format_sadd(std::ostream &n_os, const std::string &n_set_name, const std::s
 			" ", n_set_name, n_value);
 }
 
-void format_eval(std::ostream &n_os, const std::string &n_script, const std::vector<LuaArgument> &n_args) {
+void format_eval(std::ostream &n_os, const std::string &n_script, const std::vector<std::string> &n_keys, const std::vector<std::string> &n_args) {
 
 	// This is Lua script eval. I am assuming the script doesn't contain anything weird (null bytes)
 	// It does however contain lots of newlines.
@@ -164,12 +164,13 @@ void format_eval(std::ostream &n_os, const std::string &n_script, const std::vec
 	// However whenever I do it I get a protocol error. So I convert the number of arguments
 	// to a string first. This should not be necessary
 
-	std::string argstr;
-	std::back_insert_iterator<std::string> out(argstr);
-	karma::generate(out, uint_, n_args.size());
+	std::string num_keys_str;
+	std::back_insert_iterator<std::string> out(num_keys_str);
+	karma::generate(out, uint_, n_keys.size());
 
-	const std::size_t num_fields = 3    // EVAL $SCRIPT $NUMBER_OF_ARGUMENTS ...
-			+ n_args.size() * 2;         // each argument as one key and one value
+	const std::size_t num_fields = 3    // EVAL $SCRIPT $NUMBER_OF_KEYS ...
+			+ n_keys.size()             // how many keys
+			+ n_args.size();            // how many keys arguments
 
 	n_os << karma::format_delimited(
 		no_delimit['*'] << uint_ << // Array of how many fields...
@@ -177,24 +178,24 @@ void format_eval(std::ostream &n_os, const std::string &n_script, const std::vec
 		lit("EVAL") <<              // eval command
 		no_delimit['$'] << uint_ << // binary length of script
 		string <<                   // script
-		no_delimit['$'] << uint_ << // length of number of arguments string
-		string                      // number of arguments string
-		, "\r\n", num_fields, n_script.size(), n_script, argstr.size(), argstr);
+		no_delimit['$'] << uint_ << // length of number of keys string
+		string                      // number of keys string
+		, "\r\n", num_fields, n_script.size(), n_script, num_keys_str.size(), num_keys_str);
 
 	// First all the keys
-	for (const LuaArgument &a: n_args) {
+	for (const std::string &key: n_keys) {
 		n_os << karma::format_delimited(
 			no_delimit['$'] << uint_ << // binary length of script
 			string                      // script
-			, "\r\n", a.key().size(), a.key());
+			, "\r\n", key.size(), key);
 	}
 
 	// Now again for all the values
-	for (const LuaArgument &a : n_args) {
+	for (const std::string &arg : n_args) {
 		n_os << karma::format_delimited(
 			no_delimit['$'] << uint_ << // binary length of script
 			string                      // script
-			, "\r\n", a.value().size(), a.value());
+			, "\r\n", arg.size(), arg);
 	}
 }
 

@@ -13,7 +13,6 @@
 namespace moose {
 namespace mredis {
 
-
 typedef std::chrono::steady_clock Clock;
 typedef std::chrono::steady_clock::duration Duration;
 typedef std::chrono::time_point<Clock> TimePoint;
@@ -29,26 +28,9 @@ MOOSE_TOOLS_API enum class SetCondition {
 	XX           //!< set only if it does already exist
 };
 
-class LuaArgument {
-	
-	public:
-		//! Will throw when either key or value are empty
-		MREDIS_API LuaArgument(std::string &&n_key, std::string &&n_value);
-
-		// inline getters should only be available within the lib.
-		// Hence the missing decorators
-		const std::string &key() const {
-			return m_key;
-		}
-
-		const std::string &value() const {
-			return m_value;
-		}
-
-	private:
-		const std::string m_key;
-		const std::string m_value;
-};
+#if defined(BOOST_MSVC)
+void MredisTypesGetRidOfLNK4221();
+#endif
 
 }
 }

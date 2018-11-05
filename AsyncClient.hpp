@@ -218,8 +218,8 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 			@see https://redis.io/commands/lpush
 		*/
 		MREDIS_API void lpush(const std::string &n_list_name,
-								const std::string &n_value,
-								Callback &&n_callback) noexcept;
+		                      const std::string &n_value,
+		                      Callback &&n_callback) noexcept;
 
 		/*! @brief push a string to the head of a list
 			@param n_list_name the name of your set
@@ -237,8 +237,8 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 			@see https://redis.io/commands/rpush
 		 */
 		MREDIS_API void rpush(const std::string &n_list_name,
-								const std::string &n_value,
-								Callback &&n_callback) noexcept;
+		                      const std::string &n_value,
+		                      Callback &&n_callback) noexcept;
 
 		/*! @brief push a string to the end of a list
 			@param n_list_name the name of your set
@@ -264,8 +264,8 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 			@see https://redis.io/commands/sadd
 		*/
 		MREDIS_API void sadd(const std::string &n_set_name,
-		                        const std::string &n_value,
-		                        Callback &&n_callback) noexcept;
+		                     const std::string &n_value,
+		                     Callback &&n_callback) noexcept;
 
 		/*! @brief set add
 			@param n_set_name the name of your set
@@ -301,35 +301,42 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 
 		/*! @brief Evaluate the Lua script and return whatever the server says
 			@param n_script assert on empty. Will not be checked by client in any way
-			@param n_arg should of course correspond to what you do in the script
-			@param n_callback must be no-throw, will not be executed in caller's thread
-			@see https://redis.io/commands/eval
-		 */
-		MREDIS_API void eval(const std::string &n_script, const LuaArgument &n_arg, Callback &&n_callback) noexcept;
-
-		/*! @brief Evaluate the Lua script and return whatever the server says
-			@param n_script assert on empty. Will not be checked by client in any way
-			@param n_arg should of course correspond to what you do in the script
-			@returns future which will hold response, may also hold exception
-			@see https://redis.io/commands/eval
-		 */
-		MREDIS_API future_response eval(const std::string &n_script, const LuaArgument &n_arg) noexcept;
-
-		/*! @brief Evaluate the Lua script and return whatever the server says
-			@param n_script assert on empty. Will not be checked by client in any way
 			@param n_args should of course correspond to what you do in the script
 			@param n_callback must be no-throw, will not be executed in caller's thread
 			@see https://redis.io/commands/eval
 		 */
-		MREDIS_API void eval(const std::string &n_script, const std::vector<LuaArgument> &n_args, Callback &&n_callback) noexcept;
+		MREDIS_API void eval(const std::string &n_script, const std::vector<std::string> &n_args, Callback &&n_callback) noexcept;
 
 		/*! @brief Evaluate the Lua script and return whatever the server says
 			@param n_script assert on empty. Will not be checked by client in any way
+			@param n_args should of course correspond to what you do in the script
+			@returns future which will hold response, may also hold exception
+			@see https://redis.io/commands/eval
+		 */
+		MREDIS_API future_response eval(const std::string &n_script, const std::vector<std::string> &n_args) noexcept;
+
+		/*! @brief Evaluate the Lua script and return whatever the server says
+			@param n_script assert on empty. Will not be checked by client in any way
+			@param n_keys should be keys you refer to in your script
+			@param n_args should of course correspond to what you do in the script
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/eval
+		 */
+		MREDIS_API void eval(const std::string &n_script, 
+		                     const std::vector<std::string> &n_keys,
+		                     const std::vector<std::string> &n_args,
+		                     Callback &&n_callback) noexcept;
+
+		/*! @brief Evaluate the Lua script and return whatever the server says
+			@param n_script assert on empty. Will not be checked by client in any way
+			@param n_keys should be keys you refer to in your script
 			@param n_args should of course correspond to what you do in the script
 			@returns future which will hold response, may also hold exception
 			@see https://redis.io/commands/eval
 		*/
-		MREDIS_API future_response eval(const std::string &n_script, const std::vector<LuaArgument> &n_args) noexcept;
+		MREDIS_API future_response eval(const std::string &n_script, 
+		                                const std::vector<std::string> &n_keys,
+		                                const std::vector<std::string> &n_args) noexcept;
 
 		/*! @} */
 
