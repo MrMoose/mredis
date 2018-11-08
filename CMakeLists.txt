@@ -6,7 +6,7 @@
 cmake_minimum_required(VERSION 3.6)
 project(mredis)
 
-find_package(Boost 1.67.0 REQUIRED COMPONENTS chrono thread system program_options log unit_test_framework)
+find_package(Boost 1.67.0 REQUIRED COMPONENTS chrono thread system fiber program_options log unit_test_framework)
 
 set(MREDIS_SRC
 	FwdDeclarations.cpp
@@ -66,6 +66,7 @@ add_test(NAME TestRespParsers COMMAND TestRespParsers)
 add_executable(redistest redistest.cpp)
 target_link_libraries(redistest
 	mredis
+	Boost::fiber
 	Boost::program_options
 )
 

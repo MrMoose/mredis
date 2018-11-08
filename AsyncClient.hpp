@@ -5,6 +5,7 @@
 
 #pragma once
 #include "MRedisConfig.hpp"
+#include "FwdDeclarations.hpp"
 #include "MRedisResult.hpp"
 #include "MRedisTypes.hpp"
 

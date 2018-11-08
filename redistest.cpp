@@ -12,6 +12,7 @@
 #include <boost/thread.hpp>
 #include <boost/asio.hpp>
 #include <boost/program_options.hpp>
+#include <boost/fiber/all.hpp>
 
 #ifndef _WIN32
 #include <sys/resource.h>
@@ -25,6 +26,9 @@
 using namespace moose::mredis;
 using namespace moose::tools;
 
+typedef boost::fibers::promise< RedisMessage > FPromisedRedisMessage;
+typedef boost::fibers::future< RedisMessage > FFutureRedisMessage;
+
 std::string server_ip_string;
 
 void output_int_result(future_response &&n_response) {
@@ -35,6 +39,20 @@ void output_int_result(future_response &&n_response) {
 		std::cout << "Response: " << boost::get<boost::int64_t>(response) << std::endl;
 	} else {
 		std::cerr << "Unexpected response: " << response.which() << std::endl;
+	};
+}
+
+void expect_int_result(future_response &&n_response, const boost::int64_t n_expected_value) {
+
+	RedisMessage response = n_response.get();
+
+	if (is_int(response)) {
+		if (boost::get<boost::int64_t>(response) != n_expected_value) {
+			BOOST_THROW_EXCEPTION(redis_error() << error_message("Unexpected int response")
+				<< error_argument(boost::get<boost::int64_t>(response)));
+		}
+	} else {
+		BOOST_THROW_EXCEPTION(redis_error() << error_message("Not an int response"));
 	};
 }
 
@@ -59,6 +77,12 @@ void expect_string_result(const RedisMessage &n_response, const std::string &n_e
 	} else {
 		BOOST_THROW_EXCEPTION(redis_error() << error_message("Not a string response"));
 	};
+}
+
+void expect_string_result(FFutureRedisMessage &&n_message, const std::string &n_expected_string) {
+
+	RedisMessage response = n_message.get();
+	expect_string_result(response, n_expected_string);
 }
 
 void expect_string_result(future_response &&n_response, const std::string &n_expected_string) {
@@ -112,6 +136,11 @@ void test_lua() {
 		client.eval("return redis.call('set', 'foo', 'bar')"),
 		"OK"
 	);
+
+	// check for error condition. I want to know if get for a nonexisting value is an error or 0
+	expect_null_result(client.eval("return redis.call('get', 'fooo')"));
+	expect_null_result(client.eval("return redis.pcall('get', 'fooo')"));
+	expect_null_result(client.eval("return tonumber(redis.pcall('get', 'fooo'))"));
 
 	// to be used many times
 	std::vector<std::string> keys;
@@ -173,7 +202,6 @@ void test_lua() {
 	client.del("foo");
 }
 
-
 // Test setting a value with additional parameters
 void test_extended_set_params() {
 
@@ -218,13 +246,14 @@ void test_hincr_by() {
 	AsyncClient client(server_ip_string);
 	client.connect();
 
-	output_int_result(client.hincrby("myhash", "field", 1));
-	output_int_result(client.hincrby("myhash", "field", 1));
-	output_int_result(client.hincrby("myhash", "field", 1));
-	output_int_result(client.hincrby("myhash", "field", 1));
-	output_int_result(client.hincrby("myhash", "field", 1));
-	output_int_result(client.hincrby("myhash", "field", 1));
-	output_int_result(client.hincrby("myhash", "field", 1));
+	client.hset("myhash", "field", "1");
+
+	expect_int_result(client.hincrby("myhash", "field", 1), 2);
+	expect_int_result(client.hincrby("myhash", "field", 1), 3);
+	expect_int_result(client.hincrby("myhash", "field", 1), 4);
+	expect_int_result(client.hincrby("myhash", "field", 1), 5);
+	expect_int_result(client.hincrby("myhash", "field", 1), 6);
+	expect_int_result(client.hincrby("myhash", "field", 1), 7);
 
 	std::cout << "Wait a sec... " << std::endl;
 	boost::this_thread::sleep_for(boost::chrono::milliseconds(200));
@@ -254,6 +283,30 @@ void test_hincr_by() {
 	client.del("myhash");
 }
 
+// see if we can really wait on a fiber
+void test_fibers() {
+	
+	// test fiber wait
+	AsyncClient client(server_ip_string);
+	client.connect();
+
+	client.set("fibertest_1", "Hello");
+	client.set("fibertest_2", "World");
+
+	boost::shared_ptr<FPromisedRedisMessage> prom1(boost::make_shared<FPromisedRedisMessage>());
+	boost::shared_ptr<FPromisedRedisMessage> prom2(boost::make_shared<FPromisedRedisMessage>());
+
+	client.get("fibertest_1", [prom1] (const RedisMessage &n_message) {
+		prom1->set_value(n_message);
+	});
+
+	client.get("fibertest_2", [prom2] (const RedisMessage &n_message) {
+		prom2->set_value(n_message);
+	});
+
+	expect_string_result(prom2->get_future(), "World");
+	expect_string_result(prom1->get_future(), "Hello");
+}
 
 int main(int argc, char **argv) {
 	
@@ -294,6 +347,7 @@ int main(int argc, char **argv) {
 
 		test_hincr_by();
 
+		test_fibers();
 
 		std::cout << "done" << std::endl;
 
