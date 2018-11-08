@@ -108,7 +108,6 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 		/*! @brief delete a value
 			@param n_key assert on empty
 			@param n_callback must be no-throw, will not be executed in caller's thread
-			@returns future which will hold response (1), may also hold exception
 			@see https://redis.io/commands/del
 		*/
 		MREDIS_API void del(const std::string &n_key, Callback &&n_callback) noexcept;
@@ -119,7 +118,20 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 			@see https://redis.io/commands/del
 		*/
 		MREDIS_API future_response del(const std::string &n_key) noexcept;
+	
+		/*! @brief check if a key exists
+			@param n_key assert on empty
+			@param n_callback must be no-throw, will not be executed in caller's thread. Int with 0 or 1 will come in
+			@see https://redis.io/commands/del
+		 */
+		MREDIS_API void exists(const std::string &n_key, Callback &&n_callback) noexcept;
 
+		/*! @brief check if a key exists
+			@param n_key assert on empty
+			@returns future which will hold response (1 or 0), may also hold exception
+			@see https://redis.io/commands/del
+		 */
+		MREDIS_API future_response exists(const std::string &n_key) noexcept;
 
 		/*! @brief field increment by 1
 			@param n_key assert on empty

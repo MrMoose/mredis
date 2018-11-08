@@ -32,6 +32,9 @@ MREDIS_API void format_set(std::ostream &n_os, const std::string &n_key, const s
 //! @return int (1)
 MREDIS_API void format_del(std::ostream &n_os, const std::string &n_key);
 
+//! @return int (0 or 1)
+MREDIS_API void format_exists(std::ostream &n_os, const std::string &n_key);
+
 //! @return integer
 MREDIS_API void format_incr(std::ostream &n_os, const std::string &n_key);
 

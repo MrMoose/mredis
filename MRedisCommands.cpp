@@ -113,6 +113,17 @@ void format_del(std::ostream &n_os, const std::string &n_key) {
 		, "\r\n", n_key.size(), n_key);
 }
 
+void format_exists(std::ostream &n_os, const std::string &n_key) {
+	
+	n_os << karma::format_delimited(
+		lit("*2") <<                // Array of 2 fields...
+		lit("$6") <<                // Bulk string of length 6  (length of the term "EXISTS")
+		lit("EXISTS") <<            // exists command
+		no_delimit['$'] << uint_ << // binary length of key
+		string                      // key
+		, "\r\n", n_key.size(), n_key);
+}
+
 void format_incr(std::ostream &n_os, const std::string &n_key) {
 	
 	n_os << karma::format_delimited("INCR" << karma::string << karma::no_delimit["\r\n"], " ", n_key);

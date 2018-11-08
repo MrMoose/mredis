@@ -199,6 +199,24 @@ future_response AsyncClient::del(const std::string &n_key) noexcept {
 	return d().m_main_connection->send([=] (std::ostream &n_os) { format_del(n_os, n_key); })->get_future();
 }
 
+void AsyncClient::exists(const std::string &n_key, Callback &&n_callback) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT(!n_key.empty());
+
+	d().m_main_connection->send(
+			[=] (std::ostream &n_os) { format_exists(n_os, n_key); }
+			, std::move(n_callback));
+}
+
+future_response AsyncClient::exists(const std::string &n_key) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT(!n_key.empty());
+
+	return d().m_main_connection->send([=] (std::ostream &n_os) { format_exists(n_os, n_key); })->get_future();
+}
+
 void AsyncClient::incr(const std::string &n_key, Callback &&n_callback) noexcept {
 	
 	MOOSE_ASSERT(d().m_main_connection);
