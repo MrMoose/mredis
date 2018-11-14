@@ -12,7 +12,7 @@ namespace moose {
 namespace mredis {
 
 //! Some component violated protocol specifications and talked BS
-struct MOOSE_TOOLS_API redis_error : virtual tools::moose_error {
+struct MREDIS_API redis_error : virtual tools::moose_error {
 
 	virtual char const *what() const noexcept;
 
