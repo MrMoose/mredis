@@ -11,6 +11,7 @@
 #include <boost/config.hpp>
 #include <boost/thread.hpp>
 #include <boost/asio.hpp>
+#include <boost/chrono.hpp>
 #include <boost/program_options.hpp>
 #include <boost/lexical_cast.hpp>
 
@@ -18,12 +19,10 @@
 #include <sys/resource.h>
 #endif
 
-#include <chrono>
 #include <iostream>
 #include <cstdlib>
 
 #define EASY_NUM_SUBSCRIBERS 1
-
 
 
 using namespace moose::mredis;

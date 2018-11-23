@@ -8,14 +8,16 @@
 
 #include "tools/Error.hpp"
 
+#include <boost/chrono.hpp>
+
 #include <chrono>
 
 namespace moose {
 namespace mredis {
 
-typedef std::chrono::steady_clock Clock;
-typedef std::chrono::steady_clock::duration Duration;
-typedef std::chrono::time_point<Clock> TimePoint;
+using Clock = boost::chrono::steady_clock;
+using Duration = boost::chrono::steady_clock::duration;
+using TimePoint = boost::chrono::time_point<Clock>;
 
 //! Sadly, like boost chrono, the std variant also does not have an empty uninitialized default.
 constexpr Duration c_invalid_duration = Duration::max();

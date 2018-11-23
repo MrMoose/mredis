@@ -11,6 +11,7 @@
 #include <boost/config.hpp>
 #include <boost/thread.hpp>
 #include <boost/asio.hpp>
+#include <boost/chrono.hpp>
 #include <boost/program_options.hpp>
 #include <boost/fiber/all.hpp>
 
@@ -18,7 +19,6 @@
 #include <sys/resource.h>
 #endif
 
-#include <chrono>
 #include <iostream>
 #include <cstdlib>
 #include <string>
@@ -230,7 +230,7 @@ void test_extended_set_params() {
 	client.del("no_exp");
 
 	// And set it with an expiry time of one second
-	expect_string_result(client.set("no_exp", sample, std::chrono::seconds(1)), "OK");
+	expect_string_result(client.set("no_exp", sample, boost::chrono::seconds(1)), "OK");
 	expect_string_result(client.get("no_exp"), sample);
 
 	// wait just over a second

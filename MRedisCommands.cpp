@@ -12,6 +12,7 @@
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/karma_format.hpp>
 #include <boost/spirit/include/phoenix.hpp>
+#include <boost/chrono.hpp>
 
 namespace moose {
 namespace mredis {
@@ -57,7 +58,7 @@ void format_set(std::ostream &n_os, const std::string &n_key, const std::string 
 		// I need to pre-format this because I can't otherwise know the length in advance
 		expire_time_str.reserve(16);
 		std::back_insert_iterator<std::string> out(expire_time_str);
-		karma::generate(out, uint_, std::chrono::duration_cast<std::chrono::seconds>(n_expire_time).count());
+		karma::generate(out, uint_, boost::chrono::duration_cast<boost::chrono::seconds>(n_expire_time).count());
 		num_fields += 2;
 	}
 	
