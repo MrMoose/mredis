@@ -406,7 +406,7 @@ boost::uint64_t AsyncClient::subscribe(const std::string &n_channel_name, Messag
 	boost::uint64_t id = 0;
 
 	// This will go async, so I have to wait for the return
-	boost::future<bool> retval = d().m_pubsub_connection->subscribe(n_channel_name, &id, std::move(n_callback));
+	boost::unique_future<bool> retval = d().m_pubsub_connection->subscribe(n_channel_name, &id, std::move(n_callback));
 
 	// This may throw. I'll pass the exception along
 	const bool ret = retval.get();

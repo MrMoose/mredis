@@ -56,10 +56,10 @@ inline bool is_array(const RedisMessage &n_message) noexcept {
 }
 
 //! callback for all kinds of responses
-typedef std::function<void(const RedisMessage &)> Callback;
+using Callback        = std::function<void(const RedisMessage &)>;
 
 //! the way I understand the protocol, payload to a message published is always a string
-typedef std::function<void(const std::string &)> MessageCallback;
+using MessageCallback = std::function<void(const std::string &)>;
 
 struct mrequest {
 
@@ -67,10 +67,10 @@ struct mrequest {
 	Callback                                m_callback;
 };
 
-typedef boost::future<RedisMessage>              future_response;
+using future_response       = boost::unique_future<RedisMessage>;
 
-typedef boost::promise<RedisMessage>             promised_response;
-typedef boost::shared_ptr<promised_response> promised_response_ptr;
+using promised_response     = boost::promise<RedisMessage>;
+using promised_response_ptr = boost::shared_ptr<promised_response>;
 
 #if defined(BOOST_MSVC)
 MREDIS_API void MRedisResultgetRidOfLNK4221();

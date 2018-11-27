@@ -56,7 +56,7 @@ void MRedisPubsubConnection::stop() noexcept {
 }
 
 // throws std::bad_alloc
-boost::future<bool> MRedisPubsubConnection::subscribe(const std::string &n_channel_name, boost::uint64_t *n_id, MessageCallback &&n_callback) {
+boost::unique_future<bool> MRedisPubsubConnection::subscribe(const std::string &n_channel_name, boost::uint64_t *n_id, MessageCallback &&n_callback) {
 
 	MOOSE_ASSERT((n_id));
 	BOOST_LOG_SEV(logger(), normal) << "Subscribing to '" << n_channel_name << "'";
@@ -88,7 +88,7 @@ boost::future<bool> MRedisPubsubConnection::subscribe(const std::string &n_chann
 	// hand things over to io_service now and wait for a future
 	boost::promise<bool> *promised_retval = new boost::promise<bool>();
 
-	boost::future<bool> ret = promised_retval->get_future();
+	boost::unique_future<bool> ret = promised_retval->get_future();
 
 	m_pending_subscriptions.push(new pending_subscription{ n_channel_name, 0, promised_retval });
 	m_subscriptions_pending++;
@@ -488,7 +488,7 @@ void MRedisPubsubConnection::read_message() {
 			// As long as we can parse messages from our stream, continue to do so.
 			bool success = parse_from_stream(is, r);
 			if (success) {
-				boost::apply_visitor(MessageVisitor(*this), std::move(r));
+				boost::apply_visitor(MessageVisitor(*this), r);
 			} else {
 				break;
 			}

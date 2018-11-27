@@ -55,10 +55,6 @@ target_include_directories(mredis
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_compile_definitions(mredis
-	PRIVATE "-DBOOST_THREAD_VERSION=3"
-)
-
 add_subdirectory(test)
 enable_testing()
 add_test(NAME TestRespParsers COMMAND TestRespParsers)

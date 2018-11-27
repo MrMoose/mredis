@@ -28,12 +28,12 @@ class MRedisPubsubConnection : public MRedisConnection {
 		virtual ~MRedisPubsubConnection() noexcept;
 		MRedisPubsubConnection &operator=(const MRedisPubsubConnection &) = delete;
 	
-		virtual void stop() noexcept;
+		void stop() noexcept override;
 		
 		//! schedule subscription. Promise will be set true when done
 		//! @param n_id will be set when subscription returned true
 		//! @throw exception state may be set on future
-		boost::future<bool> subscribe(const std::string &n_channel_name, boost::uint64_t *n_id, MessageCallback &&n_callback);
+		boost::unique_future<bool> subscribe(const std::string &n_channel_name, boost::uint64_t *n_id, MessageCallback &&n_callback);
 
 		//! schedule unsubscribe.
 		//! @throw exception state may be set on future
@@ -54,17 +54,17 @@ class MRedisPubsubConnection : public MRedisConnection {
 		//! I keep them until unsubscribe
 
 		//! Subscription ID to handler. We can have many handlers for one channel.
-		typedef std::map<boost::uint64_t, MessageCallback> SubscriptionMap;
+		using SubscriptionMap = std::map<boost::uint64_t, MessageCallback>;
 
 		std::map<std::string, SubscriptionMap>      m_message_handlers;
 		boost::mutex                                m_message_handlers_lock;
 
 		//! A list of channel names we still have to subscribe to and promises that shall be broken
-		typedef boost::tuple<
-				  std::string             // channel name
-				, boost::uint64_t         // 0 when subscribe, set to a subscription ID when unsubscribe
-				, boost::promise<bool> *  // have ownership, respond when ready, only set for subscriptions
-		> pending_subscription;
+		using pending_subscription = boost::tuple<
+		                                           std::string            // channel name
+		                                         , boost::uint64_t        // 0 when subscribe, set to a subscription ID when unsubscribe
+		                                         , boost::promise<bool> * // have ownership, respond when ready, only set for subscriptions
+		                                         >;
 		
 		//! requests for subscriptions in here
 		boost::lockfree::queue<pending_subscription *>                 m_pending_subscriptions;
