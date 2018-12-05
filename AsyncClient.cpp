@@ -235,6 +235,24 @@ future_response AsyncClient::incr(const std::string &n_key) noexcept {
 	return d().m_main_connection->send([=](std::ostream &n_os) { format_incr(n_os, n_key); })->get_future();
 }
 
+void AsyncClient::decr(const std::string &n_key, Callback &&n_callback) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT(!n_key.empty());
+
+	d().m_main_connection->send(
+			[=](std::ostream &n_os) { format_decr(n_os, n_key); }
+			, std::move(n_callback));
+}
+
+future_response AsyncClient::decr(const std::string &n_key) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT(!n_key.empty());
+
+	return d().m_main_connection->send([=](std::ostream &n_os) { format_decr(n_os, n_key); })->get_future();
+}
+
 void AsyncClient::hincrby(const std::string &n_hash_name, const std::string &n_field_name,
 		const boost::int64_t n_increment_by, Callback &&n_callback /*= Callback()*/) noexcept {
 

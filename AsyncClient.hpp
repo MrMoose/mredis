@@ -147,6 +147,19 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 		*/
 		MREDIS_API future_response incr(const std::string &n_key) noexcept;
 
+		/*! @brief field decrement by 1
+			@param n_key assert on empty
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/decr
+		 */
+		MREDIS_API void decr(const std::string &n_key, Callback &&n_callback) noexcept;
+
+		/*! @brief field decrement by 1
+			@param n_key assert on empty
+			@returns future which will hold response, may also hold exception
+			@see https://redis.io/commands/decr
+		*/
+		MREDIS_API future_response decr(const std::string &n_key) noexcept;
 
 		/*! @} */
 

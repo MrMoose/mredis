@@ -127,7 +127,12 @@ void format_exists(std::ostream &n_os, const std::string &n_key) {
 
 void format_incr(std::ostream &n_os, const std::string &n_key) {
 	
-	n_os << karma::format_delimited("INCR" << karma::string << karma::no_delimit["\r\n"], " ", n_key);
+	n_os << karma::format("INCR \"" << karma::string << "\"\r\n", n_key);
+}
+
+void format_decr(std::ostream &n_os, const std::string &n_key) {
+
+	n_os << karma::format("DECR \"" << karma::string << "\"\r\n", n_key);
 }
 
 void format_hincrby(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name, const boost::int64_t n_incr_by) {

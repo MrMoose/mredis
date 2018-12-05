@@ -39,6 +39,9 @@ MREDIS_API void format_exists(std::ostream &n_os, const std::string &n_key);
 MREDIS_API void format_incr(std::ostream &n_os, const std::string &n_key);
 
 //! @return integer
+MREDIS_API void format_decr(std::ostream &n_os, const std::string &n_key);
+
+//! @return integer
 MREDIS_API void format_hincrby(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name, const boost::int64_t n_incr_by);
 
 //! @return string or nil
