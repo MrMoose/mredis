@@ -105,6 +105,23 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 		                               const Duration &n_expire_time = c_invalid_duration,
 		                               const SetCondition n_condition = SetCondition::NONE) noexcept;
 
+		/*! @brief set a new expiry time on a key
+			@param n_key assert on empty
+			@param n_expire_time Uses second precision albeit not really stated in docs
+			@param n_callback must be no-throw, will not be executed in caller's thread
+		
+			@see https://redis.io/commands/expire
+		 */
+		MREDIS_API void expire(const std::string &n_key, const Duration &n_expire_time, Callback &&n_callback) noexcept;
+					
+		/*! @brief set a new expiry time on a key
+			@param n_key assert on empty
+			@param n_expire_time Uses second precision albeit not really stated in docs
+			
+			@see https://redis.io/commands/expire
+		 */
+		MREDIS_API future_response expire(const std::string &n_key, const Duration &n_expire_time) noexcept;
+
 		/*! @brief delete a value
 			@param n_key assert on empty
 			@param n_callback must be no-throw, will not be executed in caller's thread

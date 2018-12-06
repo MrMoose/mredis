@@ -29,6 +29,9 @@ MREDIS_API void format_get(std::ostream &n_os, const std::string &n_key);
 MREDIS_API void format_set(std::ostream &n_os, const std::string &n_key, const std::string &n_value,
 			const Duration &n_expire_time, const SetCondition n_condition);
 
+//! @return integer
+MREDIS_API void format_expire(std::ostream &n_os, const std::string &n_key, const Duration &n_expire_time);
+
 //! @return int (1)
 MREDIS_API void format_del(std::ostream &n_os, const std::string &n_key);
 

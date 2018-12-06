@@ -103,6 +103,27 @@ void format_set(std::ostream &n_os, const std::string &n_key, const std::string 
 	}
 }
 
+MREDIS_API void format_expire(std::ostream &n_os, const std::string &n_key, const Duration &n_expire_time) {
+
+	const unsigned int num_fields = 3;
+	std::string expire_time_str;
+
+	// I need to pre-format this because I can't otherwise know the length in advance
+	expire_time_str.reserve(16);
+	std::back_insert_iterator<std::string> out(expire_time_str);
+	karma::generate(out, uint_, boost::chrono::duration_cast<boost::chrono::seconds>(n_expire_time).count());
+
+	n_os << karma::format_delimited(
+		no_delimit['*'] << uint_ << // Array of how many fields...
+		lit("$6") <<                // Bulk string of length 6  (length of the term "EXPIRE")
+		lit("EXPIRE") <<            // expire command
+		no_delimit['$'] << uint_ << // binary length of key
+		string <<                   // key
+		no_delimit['$'] << uint_ << // binary length of expire time str
+		string                      // expire time str
+		, "\r\n", num_fields, n_key.size(), n_key, expire_time_str.size(), expire_time_str);
+}
+
 void format_del(std::ostream &n_os, const std::string &n_key) {
 	
 	n_os << karma::format_delimited(

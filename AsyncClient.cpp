@@ -181,6 +181,24 @@ future_response AsyncClient::set(const std::string &n_key, const std::string &n_
 	return d().m_main_connection->send([=](std::ostream &n_os) { format_set(n_os, n_key, n_value, n_expire_time, n_condition); })->get_future();
 }
 
+void AsyncClient::expire(const std::string &n_key, const Duration &n_expire_time, Callback &&n_callback) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT(!n_key.empty());
+
+	d().m_main_connection->send(
+			[=](std::ostream &n_os) { format_expire(n_os, n_key, n_expire_time); }
+			, std::move(n_callback));
+}
+
+future_response AsyncClient::expire(const std::string &n_key, const Duration &n_expire_time) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT(!n_key.empty());
+
+	return d().m_main_connection->send([=](std::ostream &n_os) { format_expire(n_os, n_key, n_expire_time); })->get_future();
+}
+
 void AsyncClient::del(const std::string &n_key, Callback &&n_callback) noexcept {
 
 	MOOSE_ASSERT(d().m_main_connection);
