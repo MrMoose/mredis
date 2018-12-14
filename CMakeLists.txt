@@ -72,4 +72,11 @@ target_link_libraries(mt_testsuite
 	Boost::program_options
 )
 
+add_executable(fiber_testsuite fiber_testsuite.cpp)
+target_link_libraries(fiber_testsuite
+	mredis
+	Boost::fiber
+	Boost::program_options
+)
+
 
