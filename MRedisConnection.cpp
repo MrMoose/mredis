@@ -52,7 +52,7 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 	}
 
 	// I believe connect() should be sync so I catch the result in here.
-	promised_response_ptr promise(boost::make_shared<promised_response>());
+	promised_response_ptr promise(std::make_shared<promised_response>());
 	future_response res = promise->get_future(); 
 
 	asio::async_connect(m_socket, resolved_endpoints,
@@ -115,7 +115,7 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 	return;
 }
 
-void MRedisConnection::async_connect(const std::string &n_server, const boost::uint16_t n_port, boost::shared_ptr<boost::promise<bool> > n_ret) {
+void MRedisConnection::async_connect(const std::string &n_server, const boost::uint16_t n_port, std::shared_ptr<boost::promise<bool> > n_ret) {
 	
 	BOOST_LOG_FUNCTION();
 	BOOST_LOG_SEV(logger(), debug) << "Async connecting to TCP redis server on " << n_server << ":" << n_port;
@@ -224,7 +224,7 @@ void MRedisConnection::send(std::function<void(std::ostream &n_os)> &&n_prepare,
 
 promised_response_ptr MRedisConnection::send(std::function<void(std::ostream &n_os)> &&n_prepare) noexcept {
 
-	promised_response_ptr promise(boost::make_shared<promised_response>());
+	promised_response_ptr promise(std::make_shared<promised_response>());
 
 	{
 		// MOEP! Introduce lockfree queue!

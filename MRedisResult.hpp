@@ -70,7 +70,7 @@ struct mrequest {
 using future_response       = boost::unique_future<RedisMessage>;
 
 using promised_response     = boost::promise<RedisMessage>;
-using promised_response_ptr = boost::shared_ptr<promised_response>;
+using promised_response_ptr = std::shared_ptr<promised_response>;
 
 #if defined(BOOST_MSVC)
 MREDIS_API void MRedisResultgetRidOfLNK4221();

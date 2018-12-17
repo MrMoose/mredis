@@ -36,7 +36,7 @@ struct AsyncClientMembers : public moose::tools::Pimplee {
 	}
 
 	boost::asio::io_context                 m_io_context;        //!< may be owned by this or running outside
-	boost::shared_ptr<boost::asio::io_context::work> m_work;
+	std::shared_ptr<boost::asio::io_context::work> m_work;
 	std::unique_ptr<boost::thread>          m_worker_thread;     //!< the only thread that runs our io_context. implicit strand
 
 	std::string                             m_server;            //!< server hostname if TCP
@@ -133,11 +133,11 @@ boost::shared_future<bool> AsyncClient::async_connect() {
 	MOOSE_ASSERT(!d().m_pubsub_connection);
 
 	d().m_main_connection.reset(new MRedisConnection(*this));
-	boost::shared_ptr<boost::promise<bool> > promise(boost::make_shared<boost::promise<bool> >());
+	std::shared_ptr<boost::promise<bool> > promise(std::make_shared<boost::promise<bool> >());
 	d().m_main_connection->async_connect(d().m_server, d().m_port, promise);
 	
 	d().m_pubsub_connection.reset(new MRedisPubsubConnection(*this));
-	boost::shared_ptr<boost::promise<bool> > promise1(boost::make_shared<boost::promise<bool> >());
+	std::shared_ptr<boost::promise<bool> > promise1(std::make_shared<boost::promise<bool> >());
 	d().m_pubsub_connection->async_connect(d().m_server, d().m_port, promise1);
 
 	return promise->get_future();

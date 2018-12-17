@@ -293,8 +293,8 @@ void test_fibers() {
 	client.set("fibertest_1", "Hello");
 	client.set("fibertest_2", "World");
 
-	boost::shared_ptr<FPromisedRedisMessage> prom1(boost::make_shared<FPromisedRedisMessage>());
-	boost::shared_ptr<FPromisedRedisMessage> prom2(boost::make_shared<FPromisedRedisMessage>());
+	std::shared_ptr<FPromisedRedisMessage> prom1(std::make_shared<FPromisedRedisMessage>());
+	std::shared_ptr<FPromisedRedisMessage> prom2(std::make_shared<FPromisedRedisMessage>());
 
 	client.get("fibertest_1", [prom1] (const RedisMessage &n_message) {
 		prom1->set_value(n_message);
