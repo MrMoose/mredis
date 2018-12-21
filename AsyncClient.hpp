@@ -27,10 +27,6 @@ struct AsyncClientMembers;
 	not at all simple or broken or both. But I have no choice. None of the available 
 	redis client libs are suitable for this. Let's call it 'incomplete' instead 
 	because I only add commands as I need them
-
-	@note This is meant to use an io_context that is already run elsewhere.
-		It relies on the fact that this actually is run. Also, it does not support 
-		multiple threads running that io_context. Implicit strand.
  */
 class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 
