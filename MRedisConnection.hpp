@@ -49,6 +49,17 @@ class MRedisConnection {
 		 */
 		promised_response_ptr send(std::function<void(std::ostream &n_os)> &&n_prepare) noexcept;
 
+		//! connection lifecycle
+		enum class Status {
+			Disconnected = 0,
+			Connecting,
+			Connected,
+			Pushing,          // normal mode connection
+			Pubsub,           // pubsub connection
+			ShuttingDown,
+			Shutdown
+		};
+
 	protected:
 		/*! send an unknown command that can be filled by the caller via n_prepare
 			must be called from io_service thread
@@ -63,21 +74,9 @@ class MRedisConnection {
 
 		void read_response() noexcept;
 
-
 		//! when handling error conditions after async ops, use this to save some lines
 		//! @return true when error should cause closing of the connection
 		bool handle_error(const boost::system::error_code n_errc, const char *n_message) const;
-
-		//! connection lifecycle
-		enum class Status {
-			Disconnected = 0,
-			Connecting,
-			Connected,
-			Pushing,          // normal mode connection
-			Pubsub,           // pubsub connection
-			ShuttingDown,
-			Shutdown
-		};
 
 		AsyncClient                 &m_parent;
 		boost::asio::ip::tcp::socket m_socket;              //!< Socket for the connection.	
