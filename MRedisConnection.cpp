@@ -267,7 +267,7 @@ void MRedisConnection::send_command_orig(std::function<void(std::ostream &n_os)>
 
 			// I will only post a wait handler if the queue of outstanding 
 			// requests is empty to avoid having multiple in flight
-			if (m_requests_not_sent.size() > 0) {
+			if (!m_requests_not_sent.empty()) {
 				m_send_retry_timer.expires_after(asio::chrono::milliseconds(1));
 				m_send_retry_timer.async_wait(
 					[this](const boost::system::error_code &n_err) {
@@ -419,7 +419,7 @@ void MRedisConnection::read_response() noexcept {
 		if (m_buffer_busy) {
 			// I will only post a wait handler if the queue of outstanding 
 			// responses is not empty to avoid having multiple in flight
-			if (m_outstanding.size() > 0) {
+			if (!m_outstanding.empty()) {
 				m_receive_retry_timer.expires_after(asio::chrono::milliseconds(1));
 				m_receive_retry_timer.async_wait(
 					[this](const boost::system::error_code &n_err) {
@@ -438,7 +438,7 @@ void MRedisConnection::read_response() noexcept {
 		m_buffer_busy = true;
 
 		// perhaps we already have bytes to read in our streambuf. If so, I parse those first
-		while (m_outstanding.size() && m_streambuf.size()) {
+		while (!m_outstanding.empty() && m_streambuf.size()) {
 		
 			std::istream is(&m_streambuf);
 			RedisMessage r;

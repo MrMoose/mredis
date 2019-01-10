@@ -8,19 +8,17 @@
 
 #include "tools/Error.hpp"
 
-#include <boost/chrono.hpp>
-
 #include <chrono>
 
 namespace moose {
 namespace mredis {
 
-using Clock = boost::chrono::steady_clock;
-using Duration = boost::chrono::steady_clock::duration;
-using TimePoint = boost::chrono::time_point<Clock>;
+using Clock = std::chrono::steady_clock;
+using Duration = std::chrono::steady_clock::duration;
+using TimePoint = std::chrono::time_point<Clock>;
 
 //! Sadly, like boost chrono, the std variant also does not have an empty uninitialized default.
-constexpr Duration c_invalid_duration = Duration::max();
+constexpr Duration c_invalid_duration = std::chrono::steady_clock::duration::max();
 
 //! I didn't even bother looking if other commands have the same additional parameters
 //! Right now, this is only used for SET
