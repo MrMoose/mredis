@@ -11,6 +11,10 @@
 	#define MREDIS_DLL_IMPORT __declspec(dllimport)
 	#define MREDIS_DLL_EXPORT __declspec(dllexport)
 	#define MREDIS_DLL_LOCAL
+
+	#ifndef NOMINMAX
+		#define NOMINMAX
+	#endif
 #else
 	#if __GNUC__ >= 4
 		#define MREDIS_DLL_IMPORT __attribute__ ((visibility ("default")))

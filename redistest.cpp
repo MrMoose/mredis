@@ -230,7 +230,7 @@ void test_extended_set_params() {
 	client.del("no_exp");
 
 	// And set it with an expiry time of one second
-	expect_string_result(client.set("no_exp", sample, boost::chrono::seconds(1)), "OK");
+	expect_string_result(client.set("no_exp", sample, std::chrono::seconds(1)), "OK");
 	expect_string_result(client.get("no_exp"), sample);
 
 	// wait just over a second
