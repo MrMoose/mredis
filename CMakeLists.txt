@@ -13,6 +13,7 @@ set(MREDIS_SRC
 	AsyncClient.cpp
 	RESP.cpp
 	FiberRetriever.cpp
+	BlockingRetriever.cpp
 	MRedisResult.cpp
 	MRedisError.cpp
 	MRedisTypes.cpp
@@ -27,6 +28,7 @@ set(MREDIS_HDR
 	AsyncClient.hpp
 	RESP.hpp
 	FiberRetriever.hpp
+	BlockingRetriever.hpp
 	MRedisResult.hpp
 	MRedisError.hpp
 	MRedisTypes.hpp

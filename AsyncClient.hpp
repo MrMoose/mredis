@@ -215,7 +215,7 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 		/*! @brief hash map field get
 			@param n_hash_name assert on empty
 			@param n_field_name
-			@param n_callback must be no-throw, will not be executed in caller's thread
+			@returns future which will hold response, may also hold exception
 			@see https://redis.io/commands/hget
 		 */
 		MREDIS_API future_response hget(const std::string &n_hash_name,
@@ -237,12 +237,34 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 			@param n_hash_name assert on empty
 			@param n_field_nameassert on empty
 			@param n_value whatever you want to set as value
-			@param n_callback must be no-throw, will not be executed in caller's thread
+			@returns future which will hold response, may also hold exception
 			@see https://redis.io/commands/hset
 		 */
 		MREDIS_API future_response hset(const std::string &n_hash_name,
 		                        const std::string &n_field_name,
 		                        const std::string &n_value) noexcept;
+
+		/*! @brief delete a hash map field
+			@param n_hash_name assert on empty
+			@param n_field_name assert on empty
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/hdel
+		 */
+		MREDIS_API void hdel(const std::string &n_hash_name,
+								const std::string &n_field_name,
+								Callback &&n_callback) noexcept;
+
+		/*! @brief delete a hash map field
+			@param n_hash_name assert on empty
+			@param n_field_nameassert on empty
+			@param n_value whatever you want to set as value
+			@returns future which will hold response, may also hold exception
+			@see https://redis.io/commands/hdel
+		 */
+		MREDIS_API future_response hdel(const std::string &n_hash_name,
+								const std::string &n_field_name) noexcept;
+
+
 		/*! @} */
 
 

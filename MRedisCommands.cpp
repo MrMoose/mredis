@@ -175,6 +175,19 @@ void format_hset(std::ostream &n_os, const std::string &n_hash_name, const std::
 			" ", n_hash_name, n_field_name, n_value);
 }
 
+void format_hdel(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name) {
+
+	n_os << karma::format_delimited(
+		lit("*3") <<                // Array of 2 fields...
+		lit("$4") <<                // Bulk string of length 3  (length of the term "HDEL")
+		lit("HDEL") <<              // set command
+		no_delimit['$'] << uint_ << // binary length of hash name
+		string <<                   // key
+		no_delimit['$'] << uint_ << // binary length of field
+		string                      // key
+		, "\r\n", n_hash_name.size(), n_hash_name, n_field_name.size(), n_field_name);
+}
+
 void format_lpush(std::ostream &n_os, const std::string &n_list_name, const std::string &n_value) {
 
 	n_os << karma::format_delimited("LPUSH" << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
