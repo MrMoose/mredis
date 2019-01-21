@@ -84,27 +84,31 @@ inline Callback FiberRetriever<std::string>::responder() const {
 
 		using namespace moose::tools;
 
-		// translate the error into an exception that will throw when the caller get()s the future
-		if (is_error(n_message)) {
-			redis_error ex = boost::get<redis_error>(n_message);
-			this->m_promise->set_exception(std::make_exception_ptr(ex));
-			return;
-		}
+		try {
+			// translate the error into an exception that will throw when the caller get()s the future
+			if (is_error(n_message)) {
+				redis_error rerr = boost::get<redis_error>(n_message);
+				throw rerr;
+				return;
+			}
 
-		if (is_null(n_message)) {
-			this->m_promise->set_value(boost::none);
-			return;
-		}
+			if (is_null(n_message)) {
+				this->m_promise->set_value(boost::none);
+				return;
+			}
 
-		if (!is_string(n_message)) {
-			redis_error ex;
-			ex << error_message("Unexpected return type, not a string");
-			ex << error_argument(n_message.which());
-			this->m_promise->set_exception(std::make_exception_ptr(ex));
-			return;
-		}
+			if (!is_string(n_message)) {
+				BOOST_THROW_EXCEPTION(redis_error()
+					<< error_message("Unexpected return type, not a string")
+					<< error_argument(n_message.which()));
+			}
 
-		this->m_promise->set_value(boost::get<std::string>(n_message));
+			this->m_promise->set_value(boost::get<std::string>(n_message));
+
+		} catch (const redis_error &err) {
+
+			this->m_promise->set_exception(std::make_exception_ptr(err));
+		}
 	};
 }
 
@@ -115,26 +119,31 @@ inline Callback FiberRetriever<boost::int64_t>::responder() const {
 
 		using namespace moose::tools;
 
-		// translate the error into an exception that will throw when the caller get()s the future
-		if (is_error(n_message)) {
-			redis_error ex = boost::get<redis_error>(n_message);
-			this->m_promise->set_exception(std::make_exception_ptr(ex));
-			return;
-		}
+		try {
+			// translate the error into an exception that will throw when the caller get()s the future
+			if (is_error(n_message)) {
+				redis_error rerr = boost::get<redis_error>(n_message);
+				throw rerr;
+				return;
+			}
 
-		if (is_null(n_message)) {
-			this->m_promise->set_value(boost::none);
-		}
+			if (is_null(n_message)) {
+				this->m_promise->set_value(boost::none);
+				return;
+			}
 
-		if (!is_int(n_message)) {
-			redis_error ex;
-			ex << error_message("Unexpected return type, not an int");
-			ex << error_argument(n_message.which());
-			this->m_promise->set_exception(std::make_exception_ptr(ex));
-			return;
-		}
+			if (!is_int(n_message)) {
+				BOOST_THROW_EXCEPTION(redis_error()
+					<< error_message("Unexpected return type, not an int")
+					<< error_argument(n_message.which()));
+			}
 
-		this->m_promise->set_value(boost::get<boost::int64_t>(n_message));
+			this->m_promise->set_value(boost::get<boost::int64_t>(n_message));
+
+		} catch (const redis_error &err) {
+
+			this->m_promise->set_exception(std::make_exception_ptr(err));
+		}
 	};
 }
 

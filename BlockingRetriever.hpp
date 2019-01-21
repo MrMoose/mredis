@@ -47,7 +47,7 @@ class BlockingRetriever {
 		 */
 		boost::optional<Retval> wait_for_response() {
 			
-			MOOSE_ASSERT_MSG((!m_used), "Double use of get_result_in_fiber object");
+			MOOSE_ASSERT_MSG((!m_used), "Double use of BlockingRetriever object");
 
 			using namespace moose::tools;
 
@@ -62,7 +62,7 @@ class BlockingRetriever {
 			m_used.store(true);
 
 			// Now we must have a value of correct type as our callback already checked for that.
-			// This may still throw however
+			// This may still throw however, but redis_error is expected by caller
 			return boost::get<Retval>(future_value.get());
 		}
 
@@ -85,27 +85,30 @@ inline Callback BlockingRetriever<std::string>::responder() const {
 
 		using namespace moose::tools;
 
-		// translate the error into an exception that will throw when the caller get()s the future
-		if (is_error(n_message)) {
-			redis_error ex = boost::get<redis_error>(n_message);
-			this->m_promise->set_exception(std::make_exception_ptr(ex));
-			return;
-		}
+		try {
+			// I had strange errors trying to std::make_exception_ptr the error in there.
+			// Very likely due to slicing. I will transport an error code as it is
+			if (is_error(n_message)) {
+				redis_error rerr = boost::get<redis_error>(n_message);
+				throw rerr;
+			}
 
-		if (is_null(n_message)) {
-			this->m_promise->set_value(boost::none);
-			return;
-		}
+			if (is_null(n_message)) {
+				this->m_promise->set_value(boost::none);
+				return;
+			}
 
-		if (!is_string(n_message)) {
-			redis_error ex;
-			ex << error_message("Unexpected return type, not a string");
-			ex << error_argument(n_message.which());
-			this->m_promise->set_exception(std::make_exception_ptr(ex));
-			return;
-		}
+			if (!is_string(n_message)) {			
+				BOOST_THROW_EXCEPTION(redis_error()
+						<< error_message("Unexpected return type, not a string")
+						<< error_argument(n_message.which()));
+			}
 
-		this->m_promise->set_value(boost::get<std::string>(n_message));
+			this->m_promise->set_value(boost::get<std::string>(n_message));
+
+		} catch (const redis_error &err) {
+			this->m_promise->set_exception(boost::copy_exception(err));
+		}
 	};
 }
 
@@ -115,27 +118,30 @@ inline Callback BlockingRetriever<boost::int64_t>::responder() const {
 	return [this](const RedisMessage &n_message) {
 
 		using namespace moose::tools;
+		try {
+			// I had strange errors trying to std::make_exception_ptr the error in there.
+			// Very likely due to slicing. I will transport an error code as it is
+			if (is_error(n_message)) {
+				redis_error rerr = boost::get<redis_error>(n_message);
+				throw rerr;
+			}
 
-		// translate the error into an exception that will throw when the caller get()s the future
-		if (is_error(n_message)) {
-			redis_error ex = boost::get<redis_error>(n_message);
-			this->m_promise->set_exception(std::make_exception_ptr(ex));
-			return;
+			if (is_null(n_message)) {
+				this->m_promise->set_value(boost::none);
+				return;
+			}
+
+			if (!is_int(n_message)) {
+				BOOST_THROW_EXCEPTION(redis_error() 
+						<< error_message("Unexpected return type, not an int")
+						<< error_argument(n_message.which()));
+			}
+
+			this->m_promise->set_value(boost::get<boost::int64_t>(n_message));
+
+		} catch (const redis_error &err) {
+			this->m_promise->set_exception(boost::copy_exception(err));
 		}
-
-		if (is_null(n_message)) {
-			this->m_promise->set_value(boost::none);
-		}
-
-		if (!is_int(n_message)) {
-			redis_error ex;
-			ex << error_message("Unexpected return type, not an int");
-			ex << error_argument(n_message.which());
-			this->m_promise->set_exception(std::make_exception_ptr(ex));
-			return;
-		}
-
-		this->m_promise->set_value(boost::get<boost::int64_t>(n_message));
 	};
 }
 
