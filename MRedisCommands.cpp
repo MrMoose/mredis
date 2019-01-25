@@ -206,6 +206,17 @@ void format_sadd(std::ostream &n_os, const std::string &n_set_name, const std::s
 			" ", n_set_name, n_value);
 }
 
+void format_smembers(std::ostream &n_os, const std::string &n_set_name) {
+
+	n_os << karma::format_delimited(
+		lit("*2") <<                // Array of 2 fields...
+		lit("$8") <<                // Bulk string of length 8  (length of the term "SMEMBERS")
+		lit("SMEMBERS") <<          // exists command
+		no_delimit['$'] << uint_ << // binary length of key
+		string                      // key
+		, "\r\n", n_set_name.size(), n_set_name);
+}
+
 void format_eval(std::ostream &n_os, const std::string &n_script, const std::vector<std::string> &n_keys, const std::vector<std::string> &n_args) {
 
 	// This is Lua script eval. I am assuming the script doesn't contain anything weird (null bytes)

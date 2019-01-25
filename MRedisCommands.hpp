@@ -65,6 +65,9 @@ MREDIS_API void format_rpush(std::ostream &n_os, const std::string &n_list_name,
 //! @return integer
 MREDIS_API void format_sadd(std::ostream &n_os, const std::string &n_set_name, const std::string &n_value);
 
+//! @return array
+MREDIS_API void format_smembers(std::ostream &n_os, const std::string &n_set_name);
+
 //! @return whatever the script returns
 MREDIS_API void format_eval(std::ostream &n_os, const std::string &n_script, const std::vector<std::string> &n_keys, const std::vector<std::string> &n_args);
 

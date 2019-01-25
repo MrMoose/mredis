@@ -337,6 +337,20 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 		*/
 		MREDIS_API future_response sadd(const std::string &n_set_name, const std::string &n_value) noexcept;
 
+		/*! @brief get all members of a set
+			@param n_set_name the name of your set
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/smembers
+		 */
+		MREDIS_API void smembers(const std::string &n_set_name,	Callback &&n_callback) noexcept;
+
+		/*! @brief get all members of a set
+			@param n_set_name the name of your set
+
+			@returns future array with items added, may also hold exception
+			@see https://redis.io/commands/smembers
+		 */
+		MREDIS_API future_response smembers(const std::string &n_set_name) noexcept;
 
 		/*! @} */
 
