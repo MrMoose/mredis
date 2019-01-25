@@ -46,7 +46,7 @@ class FiberRetriever {
 		 */
 		boost::optional<Retval> wait_for_response() {
 			
-			MOOSE_ASSERT_MSG((!m_used), "Double use of get_result_in_fiber object");
+			MOOSE_ASSERT_MSG((!m_used), "Double use of FiberRetriever object");
 
 			using namespace moose::tools;
 
@@ -62,7 +62,7 @@ class FiberRetriever {
 
 			// Now we must have a value of correct type as our callback already checked for that.
 			// This may still throw however
-			return boost::get<Retval>(future_value.get());
+			return boost::get< boost::optional<Retval> >(future_value.get());
 		}
 
 		//! @brief use this as a callback in AsyncClient calls

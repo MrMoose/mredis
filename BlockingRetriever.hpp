@@ -63,7 +63,7 @@ class BlockingRetriever {
 
 			// Now we must have a value of correct type as our callback already checked for that.
 			// This may still throw however, but redis_error is expected by caller
-			return boost::get<Retval>(future_value.get());
+			return boost::get< boost::optional<Retval> >(future_value.get());
 		}
 
 		//! @brief use this as a callback in AsyncClient calls

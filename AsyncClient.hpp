@@ -337,6 +337,25 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 		*/
 		MREDIS_API future_response sadd(const std::string &n_set_name, const std::string &n_value) noexcept;
 
+		/*! @brief set remove
+			@param n_set_name the name of your set
+			@param n_value what to remove
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/srem
+		 */
+		MREDIS_API void srem(const std::string &n_set_name,
+		                     const std::string &n_value,
+		                     Callback &&n_callback) noexcept;
+
+		/*! @brief set remove
+			@param n_set_name the name of your set
+			@param n_value what to remove
+
+			@returns future int with number of items removed, may also hold exception
+			@see https://redis.io/commands/srem
+		*/
+		MREDIS_API future_response srem(const std::string &n_set_name, const std::string &n_value) noexcept;
+
 		/*! @brief get all members of a set
 			@param n_set_name the name of your set
 			@param n_callback must be no-throw, will not be executed in caller's thread

@@ -165,21 +165,37 @@ void format_hincrby(std::ostream &n_os, const std::string &n_hash_name, const st
 
 void format_hget(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name) {
 
-	n_os << karma::format_delimited("HGET" << karma::string << karma::string << karma::no_delimit["\r\n"],
-			" ", n_hash_name, n_field_name);
+	n_os << karma::format_delimited(
+		lit("*3") <<                // Array of 3 fields...
+		lit("$4") <<                // Bulk string of length 4  (length of the term "HGET")
+		lit("HGET") <<              // set command
+		no_delimit['$'] << uint_ << // binary length of hash name
+		string <<                   // key
+		no_delimit['$'] << uint_ << // binary length of field
+		string                      // key
+		, "\r\n", n_hash_name.size(), n_hash_name, n_field_name.size(), n_field_name);
 }
 
 void format_hset(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name, const std::string &n_value) {
 
-	n_os << karma::format_delimited("HSET" << karma::string << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
-			" ", n_hash_name, n_field_name, n_value);
+	n_os << karma::format_delimited(
+		lit("*4") <<                // Array of 4 fields...
+		lit("$4") <<                // Bulk string of length 4  (length of the term "HSET")
+		lit("HSET") <<              // set command
+		no_delimit['$'] << uint_ << // binary length of hash name
+		string <<                   // hash name
+		no_delimit['$'] << uint_ << // binary length of field name
+		string <<                   // field name
+		no_delimit['$'] << uint_ << // binary length of value
+		string                      // value
+		, "\r\n", n_hash_name.size(), n_hash_name, n_field_name.size(), n_field_name, n_value.size(), n_value);
 }
 
 void format_hdel(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name) {
 
 	n_os << karma::format_delimited(
-		lit("*3") <<                // Array of 2 fields...
-		lit("$4") <<                // Bulk string of length 3  (length of the term "HDEL")
+		lit("*3") <<                // Array of 3 fields...
+		lit("$4") <<                // Bulk string of length 4  (length of the term "HDEL")
 		lit("HDEL") <<              // set command
 		no_delimit['$'] << uint_ << // binary length of hash name
 		string <<                   // key
@@ -202,8 +218,28 @@ void format_rpush(std::ostream &n_os, const std::string &n_list_name, const std:
 
 void format_sadd(std::ostream &n_os, const std::string &n_set_name, const std::string &n_value) {
 
-	n_os << karma::format_delimited("SADD" << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
-			" ", n_set_name, n_value);
+	n_os << karma::format_delimited(
+		lit("*3") <<                // Array of 2 fields...
+		lit("$4") <<                // Bulk string of length 4  (length of the term "SADD")
+		lit("SADD") <<              // sadd command
+		no_delimit['$'] << uint_ << // binary length of set name
+		string <<                   // set name
+		no_delimit['$'] << uint_ << // binary length of value
+		string                      // value
+		, "\r\n", n_set_name.size(), n_set_name, n_value.size(), n_value);
+}
+
+void format_srem(std::ostream &n_os, const std::string &n_set_name, const std::string &n_value) {
+
+	n_os << karma::format_delimited(
+		lit("*3") <<                // Array of 2 fields...
+		lit("$4") <<                // Bulk string of length 4  (length of the term "SREM")
+		lit("SREM") <<              // srem command
+		no_delimit['$'] << uint_ << // binary length of set name
+		string <<                   // set name
+		no_delimit['$'] << uint_ << // binary length of value
+		string                      // value
+		, "\r\n", n_set_name.size(), n_set_name, n_value.size(), n_value);
 }
 
 void format_smembers(std::ostream &n_os, const std::string &n_set_name) {
@@ -211,7 +247,7 @@ void format_smembers(std::ostream &n_os, const std::string &n_set_name) {
 	n_os << karma::format_delimited(
 		lit("*2") <<                // Array of 2 fields...
 		lit("$8") <<                // Bulk string of length 8  (length of the term "SMEMBERS")
-		lit("SMEMBERS") <<          // exists command
+		lit("SMEMBERS") <<          // smembers command
 		no_delimit['$'] << uint_ << // binary length of key
 		string                      // key
 		, "\r\n", n_set_name.size(), n_set_name);
