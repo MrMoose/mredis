@@ -66,10 +66,7 @@ class FiberRetriever {
 		}
 
 		//! @brief use this as a callback in AsyncClient calls
-		Callback responder() const {
-
-			static_assert(false, "Non MRedis answer type cannot be used with this template");
-		}
+		Callback responder() const = delete;
 
 	private:
 		const unsigned int     m_timeout;
@@ -89,7 +86,6 @@ inline Callback FiberRetriever<std::string>::responder() const {
 			if (is_error(n_message)) {
 				redis_error rerr = boost::get<redis_error>(n_message);
 				throw rerr;
-				return;
 			}
 
 			if (is_null(n_message)) {

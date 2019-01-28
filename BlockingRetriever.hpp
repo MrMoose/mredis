@@ -67,10 +67,7 @@ class BlockingRetriever {
 		}
 
 		//! @brief use this as a callback in AsyncClient calls
-		Callback responder() const {
-
-			static_assert(false, "Non MRedis answer type cannot be used with this template");
-		}
+		Callback responder() const = delete;
 
 	private:
 		const unsigned int     m_timeout;
