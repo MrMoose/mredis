@@ -93,7 +93,6 @@ inline Callback FiberRetriever<std::string>::responder() const {
 			if (is_error(n_message)) {
 				redis_error rerr = boost::get<redis_error>(n_message);
 				throw rerr;
-				return;
 			}
 
 			if (is_null(n_message)) {
