@@ -67,10 +67,14 @@ class BlockingRetriever {
 		}
 
 		//! @brief use this as a callback in AsyncClient calls
+#if BOOST_MSVC
 		Callback responder() const {
-
-			static_assert(false, "Non MRedis answer type cannot be used with this template");
-		}
+			
+			static_assert(sizeof(Retval) == -1, "Do not use general reponder function. Specialize for Retval type")
+		};
+#else
+		Callback responder() const = delete;
+#endif
 
 	private:
 		const unsigned int     m_timeout;
