@@ -256,14 +256,26 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 
 		/*! @brief delete a hash map field
 			@param n_hash_name assert on empty
-			@param n_field_nameassert on empty
-			@param n_value whatever you want to set as value
+			@param n_field_name assert on empty
 			@returns future which will hold response, may also hold exception
 			@see https://redis.io/commands/hdel
 		 */
 		MREDIS_API future_response hdel(const std::string &n_hash_name,
 								const std::string &n_field_name) noexcept;
 
+		/*! @brief get all members of a hash map
+			@param n_hash_name assert on empty
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/hgetall
+		 */
+		MREDIS_API void hgetall(const std::string &n_hash_name, Callback &&n_callback) noexcept;
+
+		/*! @brief get all members of a hash map
+			@param n_hash_name assert on empty
+			@returns future with an array twice the size of the hash, each member is followed by its value
+			@see https://redis.io/commands/hgetall
+		 */
+		MREDIS_API future_response hgetall(const std::string &n_hash_name) noexcept;
 
 		/*! @} */
 

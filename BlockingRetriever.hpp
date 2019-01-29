@@ -149,6 +149,39 @@ inline Callback BlockingRetriever<boost::int64_t>::responder() const {
 	};
 }
 
+template<>
+inline Callback BlockingRetriever< std::vector<RedisMessage> >::responder() const {
+
+	return [this](const RedisMessage &n_message) {
+
+		using namespace moose::tools;
+
+		try {
+			// translate the error into an exception that will throw when the caller get()s the future
+			if (is_error(n_message)) {
+				redis_error rerr = boost::get<redis_error>(n_message);
+				throw rerr;
+			}
+
+			if (is_null(n_message)) {
+				this->m_promise->set_value(boost::none);
+				return;
+			}
+
+			if (!is_array(n_message)) {
+				BOOST_THROW_EXCEPTION(redis_error()
+						<< error_message("Unexpected return type, not an array")
+						<< error_argument(n_message.which()));
+			}
+
+			this->m_promise->set_value(boost::get< std::vector<RedisMessage> >(n_message));
+
+		} catch (const redis_error &err) {
+			this->m_promise->set_exception(std::make_exception_ptr(err));
+		}
+	};
+}
+
 #if defined(BOOST_MSVC)
 MREDIS_API void BlockingRetrievergetRidOfLNK4221();
 #endif
