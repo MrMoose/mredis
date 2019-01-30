@@ -44,6 +44,22 @@ void format_get(std::ostream &n_os, const std::string &n_key) {
 		, "\r\n", n_key.size(), n_key);
 }
 
+void format_mget(std::ostream &n_os, const std::vector<std::string> &n_keys) {
+	
+	n_os << karma::format_delimited(
+		no_delimit['*'] << uint_ << // Array of how many fields...
+		lit("$4") <<                // Bulk string of length 4 (length of the term "MGET")
+		lit("MGET")
+		, "\r\n", 1 + n_keys.size());
+
+	for (const std::string &s : n_keys) {
+		n_os << karma::format_delimited(
+			no_delimit['$'] << uint_ << // binary length of key
+			string                      // key
+			, "\r\n", s.size(), s);
+	}
+}
+
 void format_set(std::ostream &n_os, const std::string &n_key, const std::string &n_value,
 		const Duration &n_expire_time, const SetCondition n_condition) {
 

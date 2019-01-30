@@ -161,6 +161,24 @@ future_response AsyncClient::get(const std::string &n_key) noexcept {
 	return d().m_main_connection->send([=](std::ostream &n_os) { format_get(n_os, n_key); })->get_future();
 }
 
+void AsyncClient::mget(const std::vector<std::string> &n_keys, Callback &&n_callback) noexcept {
+	
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT(!n_keys.empty());
+
+	d().m_main_connection->send(
+			[=](std::ostream &n_os) { format_mget(n_os, n_keys); }
+			, std::move(n_callback));
+}
+
+future_response AsyncClient::mget(const std::vector<std::string> &n_keys) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT(!n_keys.empty());
+
+	return d().m_main_connection->send([=](std::ostream &n_os) { format_mget(n_os, n_keys); })->get_future();
+}
+
 void AsyncClient::set(const std::string &n_key, const std::string &n_value, Callback &&n_callback,
 		const Duration &n_expire_time /* = Duration::max() */, const SetCondition n_condition /* = SetCondition::NONE*/) noexcept {
 	

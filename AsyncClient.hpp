@@ -74,6 +74,20 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 		 */
 		MREDIS_API future_response get(const std::string &n_key) noexcept;
 
+		/*! @brief basic bulk get
+			@param n_keys assert on empty
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/mget
+		 */
+		MREDIS_API void mget(const std::vector<std::string> &n_keys, Callback &&n_callback) noexcept;
+
+		/*! @brief basic bulk get
+			@param n_keys assert on empty
+			@returns future which will holds an array of strings or nil values, may also hold exception
+			@see https://redis.io/commands/mget
+		 */
+		MREDIS_API future_response mget(const std::vector<std::string> &n_keys) noexcept;
+
 		/*! @brief set with a vengeance
 			@param n_key assert on empty
 			@param n_value may be binary

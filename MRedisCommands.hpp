@@ -10,6 +10,7 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace moose {
 namespace mredis {
@@ -24,6 +25,9 @@ MREDIS_API void format_ping(std::ostream &n_os);
 
 //! @return bulk string or nil
 MREDIS_API void format_get(std::ostream &n_os, const std::string &n_key);
+
+//! @return array with values (as string) or nil (on not found)
+MREDIS_API void format_mget(std::ostream &n_os, const std::vector<std::string> &n_keys);
 
 //! @return integer
 MREDIS_API void format_set(std::ostream &n_os, const std::string &n_key, const std::string &n_value,
