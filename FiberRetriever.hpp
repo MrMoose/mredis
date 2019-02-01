@@ -65,7 +65,12 @@ class FiberRetriever {
 			return boost::get< boost::optional<Retval> >(future_value.get());
 		}
 
-		//! @brief use this as a callback in AsyncClient calls
+		/*! @brief use this as a callback in AsyncClient calls
+			#moep also this is unsafe. When handing this into the get call, it might throw, calling the d'tor 
+				on the retriever object but leaving this handler intact. When it is later than called, it will
+				crash. Fix by making this shared_from_this and handing in the shared_ptr rather than the 
+				callback only.
+		 */
 #if BOOST_MSVC
 		Callback responder() const {
 
