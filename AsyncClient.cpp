@@ -143,6 +143,22 @@ boost::shared_future<bool> AsyncClient::async_connect() {
 	return promise->get_future();
 }
 
+void AsyncClient::time(Callback &&n_callback) noexcept {
+	
+	MOOSE_ASSERT(d().m_main_connection);
+
+	d().m_main_connection->send(
+			[=](std::ostream &n_os) { format_time(n_os); }
+			, std::move(n_callback));
+}
+
+future_response AsyncClient::time() noexcept {
+	
+	MOOSE_ASSERT(d().m_main_connection);
+
+	return d().m_main_connection->send([=](std::ostream &n_os) { format_time(n_os); })->get_future();
+}
+
 void AsyncClient::get(const std::string &n_key, Callback &&n_callback) noexcept {
 
 	MOOSE_ASSERT(d().m_main_connection);

@@ -33,6 +33,11 @@ void format_ping(std::ostream &n_os) {
 	n_os << karma::format("PING\r\n");
 }
 
+void format_time(std::ostream &n_os) {
+
+	n_os << karma::format("TIME\r\n");
+}
+
 void format_get(std::ostream &n_os, const std::string &n_key) {
 
 	n_os << karma::format_delimited(
@@ -165,12 +170,24 @@ void format_exists(std::ostream &n_os, const std::string &n_key) {
 
 void format_incr(std::ostream &n_os, const std::string &n_key) {
 	
-	n_os << karma::format("INCR \"" << karma::string << "\"\r\n", n_key);
+	n_os << karma::format_delimited(
+		lit("*2") <<                // Array of 2 fields...
+		lit("$4") <<                // Bulk string of length 4  (length of the term "INCR")
+		lit("INCR") <<              // incr command
+		no_delimit['$'] << uint_ << // binary length of key
+		string                      // key
+		, "\r\n", n_key.size(), n_key);
 }
 
 void format_decr(std::ostream &n_os, const std::string &n_key) {
 
-	n_os << karma::format("DECR \"" << karma::string << "\"\r\n", n_key);
+	n_os << karma::format_delimited(
+		lit("*2") <<                // Array of 2 fields...
+		lit("$4") <<                // Bulk string of length 4  (length of the term "DECR")
+		lit("DECR") <<              // decr command
+		no_delimit['$'] << uint_ << // binary length of key
+		string                      // key
+		, "\r\n", n_key.size(), n_key);
 }
 
 void format_hincrby(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name, const boost::int64_t n_incr_by) {

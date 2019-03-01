@@ -60,6 +60,19 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 			@{
 		*/
 
+		/*! @brief get the current server time
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/time
+		 */
+		MREDIS_API void time(Callback &&n_callback) noexcept;
+
+		/*! @brief get the current server time
+			@returns future which will hold response, may also hold exception
+			@see https://redis.io/commands/time
+		 */
+		MREDIS_API future_response time() noexcept;
+
+
 		/*! @brief most basic get
 			@param n_key assert on empty
 			@param n_callback must be no-throw, will not be executed in caller's thread

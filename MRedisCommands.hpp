@@ -23,6 +23,10 @@ namespace mredis {
 //! write a ping into the stream
 MREDIS_API void format_ping(std::ostream &n_os);
 
+//! ask for the time
+//! @return array with secs and microsecs 
+MREDIS_API void format_time(std::ostream &n_os);
+
 //! @return bulk string or nil
 MREDIS_API void format_get(std::ostream &n_os, const std::string &n_key);
 
