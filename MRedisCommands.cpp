@@ -342,6 +342,62 @@ void format_eval(std::ostream &n_os, const std::string &n_script, const std::vec
 	}
 }
 
+void format_evalsha(std::ostream &n_os, const std::string &n_sha, const std::vector<std::string> &n_keys, const std::vector<std::string> &n_args) {
+
+	// This is Lua script eval. I am assuming the script doesn't contain anything weird (null bytes)
+	// It does however contain lots of newlines.
+	// The keys and values however might contain binary. So I try the bulk approach first
+
+	// According to how I read the protocol specs Redis should accept arrays of mixed types
+	// However whenever I do it I get a protocol error. So I convert the number of arguments
+	// to a string first. This should not be necessary
+
+	std::string num_keys_str;
+	std::back_insert_iterator<std::string> out(num_keys_str);
+	karma::generate(out, uint_, n_keys.size());
+
+	const std::size_t num_fields = 3    // EVAL $SCRIPT $NUMBER_OF_KEYS ...
+	        + n_keys.size()             // how many keys
+	        + n_args.size();            // how many keys arguments
+
+	n_os << karma::format_delimited(
+	    no_delimit['*'] << uint_ << // Array of how many fields...
+	    lit("$7") <<                // Bulk string of length 4 (length of the term "EVALSHA")
+	    lit("EVALSHA") <<           // evalsha command
+	    no_delimit['$'] << uint_ << // binary length of hash
+	    string <<                   // hash
+	    no_delimit['$'] << uint_ << // length of number of keys string
+	    string                      // number of keys string
+	    , "\r\n", num_fields, n_sha.size(), n_sha, num_keys_str.size(), num_keys_str);
+
+	// First all the keys
+	for (const std::string &key: n_keys) {
+		n_os << karma::format_delimited(
+		    no_delimit['$'] << uint_ << // binary length of script
+		    string                      // script
+		    , "\r\n", key.size(), key);
+	}
+
+	// Now again for all the values
+	for (const std::string &arg : n_args) {
+		n_os << karma::format_delimited(
+		    no_delimit['$'] << uint_ << // binary length of script
+		    string                      // script
+		    , "\r\n", arg.size(), arg);
+	}
+}
+
+void format_script_load(std::ostream &n_os, const std::string &n_script) {
+
+	n_os << karma::format_delimited(
+	    lit("*2") <<                // Array of 2 fields...
+	    lit("$11") <<               // Bulk string of length 11  (length of the term "SCRIPT LOAD")
+	    lit("SCRIPT LOAD") <<       // script load command
+	    no_delimit['$'] << uint_ << // binary length of script
+	    string                      // script
+	    , "\r\n", n_script.size(), n_script);
+}
+
 void format_subscribe(std::ostream &n_os, const std::string &n_channel_name) {
 	
 	n_os << karma::format_delimited("SUBSCRIBE MREDIS_WAKEUP" << karma::no_delimit[karma::string << "\r\n"],
@@ -357,7 +413,7 @@ void format_unsubscribe(std::ostream &n_os, const std::string &n_channel_name) {
 void format_publish(std::ostream &n_os, const std::string &n_channel_name, const std::string &n_message) {
 
 	n_os << karma::format_delimited("PUBLISH" << karma::string << karma::no_delimit['\"' << karma::string << "\"\r\n"],
-			" ", n_channel_name, n_message);
+	        " ", n_channel_name, n_message);
 }
 
 }

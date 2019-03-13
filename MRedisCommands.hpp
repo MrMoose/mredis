@@ -85,6 +85,12 @@ MREDIS_API void format_smembers(std::ostream &n_os, const std::string &n_set_nam
 //! @return whatever the script returns
 MREDIS_API void format_eval(std::ostream &n_os, const std::string &n_script, const std::vector<std::string> &n_keys, const std::vector<std::string> &n_args);
 
+//! @return whatever the script returns
+MREDIS_API void format_evalsha(std::ostream &n_os, const std::string &n_sha, const std::vector<std::string> &n_keys, const std::vector<std::string> &n_args);
+
+//! @return string with hash
+MREDIS_API void format_script_load(std::ostream &n_os, const std::string &n_script);
+
 //! will always subscribe to MREDIS_WAKEUP as well to get a dummy message in order to interrupt dormant pubsub connections
 MREDIS_API void format_subscribe(std::ostream &n_os, const std::string &n_channel_name);
 MREDIS_API void format_unsubscribe(std::ostream &n_os, const std::string &n_channel_name);

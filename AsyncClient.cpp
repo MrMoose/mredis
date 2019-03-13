@@ -539,6 +539,83 @@ future_response AsyncClient::eval(const std::string &n_script, const std::vector
 	return d().m_main_connection->send([=] (std::ostream &n_os) { format_eval(n_os, n_script, n_keys, n_args); })->get_future();
 }
 
+void AsyncClient::evalsha(const std::string &n_sha, Callback &&n_callback) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT_MSG(!n_sha.empty(), "Must not give empty hash into svalsha()");
+
+	d().m_main_connection->send(
+	        [=] (std::ostream &n_os) { format_evalsha(n_os, n_sha, std::vector<std::string>(), std::vector<std::string>()); }
+	        , std::move(n_callback));
+}
+
+future_response AsyncClient::evalsha(const std::string &n_sha) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT_MSG(!n_sha.empty(), "Must not give empty hash into svalsha()");
+
+	return d().m_main_connection->send([=] (std::ostream &n_os) {
+		format_evalsha(n_os, n_sha, std::vector<std::string>(), std::vector<std::string>()); })->get_future();
+}
+
+void AsyncClient::evalsha(const std::string &n_sha, const std::vector<std::string> &n_args, Callback &&n_callback) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT_MSG(!n_sha.empty(), "Must not give empty hash into svalsha()");
+
+	std::vector<std::string> keys;
+
+	d().m_main_connection->send(
+	        [=] (std::ostream &n_os) { format_evalsha(n_os, n_sha, keys, n_args); }
+	        , std::move(n_callback));
+}
+
+future_response AsyncClient::evalsha(const std::string &n_sha, const std::vector<std::string> &n_args) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT_MSG(!n_sha.empty(), "Must not give empty hash into svalsha()");
+
+	std::vector<std::string> keys;
+
+	return d().m_main_connection->send([=] (std::ostream &n_os) { format_evalsha(n_os, n_sha, keys, n_args); })->get_future();
+}
+
+void AsyncClient::evalsha(const std::string &n_sha, const std::vector<std::string> &n_keys,
+        const std::vector<std::string> &n_args, Callback &&n_callback) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT_MSG(!n_sha.empty(), "Must not give empty hash into svalsha()");
+
+	d().m_main_connection->send(
+	        [=] (std::ostream &n_os) { format_evalsha(n_os, n_sha, n_keys, n_args); }
+	        , std::move(n_callback));
+}
+
+future_response AsyncClient::evalsha(const std::string &n_sha, const std::vector<std::string> &n_keys,
+        const std::vector<std::string> &n_args) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT_MSG(!n_sha.empty(), "Must not give empty hash into svalsha()");
+
+	return d().m_main_connection->send([=] (std::ostream &n_os) { format_evalsha(n_os, n_sha, n_keys, n_args); })->get_future();
+}
+
+void AsyncClient::script_load(const std::string &n_script, Callback &&n_callback) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+
+	d().m_main_connection->send(
+	        [=] (std::ostream &n_os) { format_script_load(n_os, n_script); }
+	        , std::move(n_callback));
+}
+
+future_response AsyncClient::script_load(const std::string &n_script) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+
+	return d().m_main_connection->send([=] (std::ostream &n_os) { format_script_load(n_os, n_script); })->get_future();
+}
+
 boost::uint64_t AsyncClient::subscribe(const std::string &n_channel_name, MessageCallback &&n_callback) {
 
 	MOOSE_ASSERT(d().m_pubsub_connection);

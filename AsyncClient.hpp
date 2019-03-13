@@ -466,10 +466,77 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 			@param n_args should of course correspond to what you do in the script
 			@returns future which will hold response, may also hold exception
 			@see https://redis.io/commands/eval
-		*/
+		 */
 		MREDIS_API future_response eval(const std::string &n_script, 
 		                                const std::vector<std::string> &n_keys,
 		                                const std::vector<std::string> &n_args) noexcept;
+
+		/*! @brief Evaluate a preloaded Lua script and return whatever the server says
+			@param n_sha assert on empty. Hash of a preloaded script
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/evalsha
+		 */
+		MREDIS_API void evalsha(const std::string &n_sha, Callback &&n_callback) noexcept;
+
+		/*! @brief Evaluate a preloaded Lua script and return whatever the server says
+			@param n_sha assert on empty. Hash of a preloaded script
+			@returns future which will hold response, may also hold exception
+			@see https://redis.io/commands/evalsha
+		 */
+		MREDIS_API future_response evalsha(const std::string &n_sha) noexcept;
+
+		/*! @brief Evaluate a preloaded Lua script and return whatever the server says
+			@param n_sha assert on empty. Hash of a preloaded script
+			@param n_args should of course correspond to what you do in the script
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/evalsha
+		 */
+		MREDIS_API void evalsha(const std::string &n_sha, const std::vector<std::string> &n_args, Callback &&n_callback) noexcept;
+
+		/*! @brief Evaluate a preloaded Lua script and return whatever the server says
+			@param n_sha assert on empty. Hash of a preloaded script
+			@param n_args should of course correspond to what you do in the script
+			@returns future which will hold response, may also hold exception
+			@see https://redis.io/commands/evalsha
+		 */
+		MREDIS_API future_response evalsha(const std::string &n_sha, const std::vector<std::string> &n_args) noexcept;
+
+		/*! @brief Evaluate a preloaded Lua script and return whatever the server says
+			@param n_sha assert on empty. Hash of a preloaded script
+			@param n_keys should be keys you refer to in your script
+			@param n_args should of course correspond to what you do in the script
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/evalsha
+		 */
+		MREDIS_API void evalsha(const std::string &n_sha,
+		                     const std::vector<std::string> &n_keys,
+		                     const std::vector<std::string> &n_args,
+		                     Callback &&n_callback) noexcept;
+
+		/*! @brief Evaluate a preloaded Lua script and return whatever the server says
+			@param n_sha assert on empty. Hash of a preloaded script
+			@param n_keys should be keys you refer to in your script
+			@param n_args should of course correspond to what you do in the script
+			@returns future which will hold response, may also hold exception
+			@see https://redis.io/commands/evalsha
+		 */
+		MREDIS_API future_response evalsha(const std::string &n_sha,
+		                                const std::vector<std::string> &n_keys,
+		                                const std::vector<std::string> &n_args) noexcept;
+
+		/*! @brief Preload a Lua script into cache for later evalsha
+			@param n_script assert on empty. Will not be checked by client in any way
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/script-load
+		 */
+		MREDIS_API void script_load(const std::string &n_script, Callback &&n_callback) noexcept;
+
+		/*! @brief Preload a Lua script into cache for later evalsha
+			@param n_script assert on empty. Will not be checked by client in any way
+			@return future string with SHA1 hash in it
+			@see https://redis.io/commands/script-load
+		 */
+		MREDIS_API future_response script_load(const std::string &n_script) noexcept;
 
 		/*! @} */
 
