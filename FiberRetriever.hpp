@@ -42,7 +42,7 @@ class FiberRetriever {
 
 		/*! @brief call either that or get the future
 			@return value if set, otherwise none
-			@throw redis_error
+			@throw redis_error on timeout or underlying condition
 		 */
 		boost::optional<Retval> wait_for_response() {
 			
@@ -74,7 +74,7 @@ class FiberRetriever {
 #if BOOST_MSVC
 		Callback responder() const {
 
-			static_assert(sizeof(Retval) == -1, "Do not use general reponder function. Specialize for Retval type")
+			static_assert(sizeof(Retval) == -1, "Do not use general responder function. Specialize for Retval type")
 		};
 #else
 		Callback responder() const = delete;
@@ -114,7 +114,6 @@ inline Callback FiberRetriever<std::string>::responder() const {
 			this->m_promise->set_value(boost::get<std::string>(n_message));
 
 		} catch (const redis_error &err) {
-
 			this->m_promise->set_exception(std::make_exception_ptr(err));
 		}
 	};

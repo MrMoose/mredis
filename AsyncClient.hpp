@@ -23,9 +23,8 @@ namespace mredis {
 struct AsyncClientMembers;
 
 /*! @brief simple async Redis client.
-	And yes, I know. Classes that are described as "simple" generally turn out 
-	not at all simple or broken or both. But I have no choice. None of the available 
-	redis client libs are suitable for this. Let's call it 'incomplete' instead 
+	And yes, I know. Classes that are described as "simple" generally turn out to be
+	not simple at all or broken or both. Let's call it 'incomplete' instead 
 	because I only add commands as I need them
  */
 class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
@@ -33,6 +32,7 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 	public:
 		
 		//! use local unix domain socket
+		//! @note not implemented
 		MREDIS_API AsyncClient();
 
 		/*! use IP to do TCP connect
@@ -44,33 +44,25 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 
 		/*! @brief sync connect and block until connected
 			@note if already connected, will re-connect
-			@throw network_error on cannot resolve host name
+			@throw network_error on cannot resolve host name or connection timeout
 		 */
 		MREDIS_API void connect();
 
 		/*! @brief start async connect, return immediately
 			Once connected, returned future will turn true for OK or false for not OK
 			@note if already connected, will re-connect
-			@throw network_error on cannot resolve host name
+
+			will not throw but the resulting future will, if connection timed out
+
+			@throw network_error on cannot resolve host name or connection timeout
 		 */
 		MREDIS_API boost::shared_future<bool> async_connect();
+
 
 		/*! @defgroup basic functions
 			They all assert when connect wasn't called.
 			@{
 		*/
-
-		/*! @brief get the current server time
-			@param n_callback must be no-throw, will not be executed in caller's thread
-			@see https://redis.io/commands/time
-		 */
-		MREDIS_API void time(Callback &&n_callback) noexcept;
-
-		/*! @brief get the current server time
-			@returns future which will hold response, may also hold exception
-			@see https://redis.io/commands/time
-		 */
-		MREDIS_API future_response time() noexcept;
 
 
 		/*! @brief most basic get
@@ -116,7 +108,7 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 		                    const SetCondition n_condition = SetCondition::NONE) noexcept;
 
 		/*! @brief set with a vengeance
-			@param n_key assert on empty
+			@param n_key throw on empty
 			@param n_value may be binary
 			@param n_expire_time will only be set if not c_invalid_duration. Uses second precision to not fool around
 			@param n_condition optional set condition
@@ -582,9 +574,50 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 
 		/*! @} */
 
+		/*! @defgroup miscellaneous helpers and stuff
+			They all assert when connect wasn't called.
+			@{
+		*/
+
+		/*! @brief get the current server time
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/time
+		 */
+		MREDIS_API void time(Callback &&n_callback) noexcept;
+
+		/*! @brief get the current server time
+			@returns future which will hold response, may also hold exception
+			@see https://redis.io/commands/time
+		 */
+		MREDIS_API future_response time() noexcept;
+	
+		/*! @brief sleep for a number of seconds and return
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/topics/latency-monitor
+		 */
+		MREDIS_API void debug_sleep(const boost::int64_t n_seconds, Callback &&n_callback) noexcept;
+
+		/*! @brief sleep for a number of seconds and return
+			@returns future which will hold response, may also hold exception
+			@see https://redis.io/topics/latency-monitor
+		 */
+		MREDIS_API future_response debug_sleep(const boost::int64_t n_seconds) noexcept;
+
+		/*! @} */
+
 	private:
 
 		boost::asio::io_context &io_context() noexcept;
+
+		/*! owned connections call this to notify the client object about their sudden demise
+			we shall release the pointer and try to reconnect
+
+			Since this owns the connections, calling this is required for a connection d'tor to be called
+
+			@param n_connection will release this connection, causing the connection object to die
+			@param n_reconnect if true, the connection can signal that a re-connect is sensible
+		 */
+		void release_connection(class MRedisConnection *n_connection) noexcept;
 
 		friend class MRedisConnection;
 		friend class MRedisPubsubConnection;

@@ -41,8 +41,11 @@ struct AsyncClientMembers : public moose::tools::Pimplee {
 
 	std::string                             m_server;            //!< server hostname if TCP
 	boost::uint16_t                         m_port;              //!< server port
+
 	std::unique_ptr<MRedisConnection>       m_main_connection;   //!< this connection handles every major command on a pushing line
 	std::unique_ptr<MRedisPubsubConnection> m_pubsub_connection; //!< connection specific for pubsub messages
+	bool                                    m_connection_restart;//!< when child connections die, they may request reconnect on demand
+
 };
 
 
@@ -68,6 +71,8 @@ AsyncClient::AsyncClient(const std::string &n_server, const boost::uint16_t n_po
 AsyncClient::~AsyncClient() noexcept {
 
 	if (d().m_main_connection) {
+
+		// Stop will have 
 		d().m_main_connection->stop();
 		d().m_io_context.poll();
 		d().m_main_connection.reset();
@@ -199,7 +204,10 @@ void AsyncClient::set(const std::string &n_key, const std::string &n_value, Call
 		const Duration &n_expire_time /* = Duration::max() */, const SetCondition n_condition /* = SetCondition::NONE*/) noexcept {
 	
 	MOOSE_ASSERT(d().m_main_connection);
-	MOOSE_ASSERT(!n_key.empty());
+
+	if (n_key.empty()) {
+		BOOST_THROW_EXCEPTION(redis_error() << error_message("Key cannot be empty"));
+	}
 
 	d().m_main_connection->send(
 			[=](std::ostream &n_os) { format_set(n_os, n_key, n_value, n_expire_time, n_condition); }
@@ -209,8 +217,11 @@ void AsyncClient::set(const std::string &n_key, const std::string &n_value, Call
 future_response AsyncClient::set(const std::string &n_key, const std::string &n_value,
 		const Duration &n_expire_time /* = c_invalid_duration */, const SetCondition n_condition /* = SetCondition::NONE*/) noexcept {
 
+	if (n_key.empty()) {
+		BOOST_THROW_EXCEPTION(redis_error() << error_message("Key cannot be empty"));
+	}
+
 	MOOSE_ASSERT(d().m_main_connection);
-	MOOSE_ASSERT(!n_key.empty());
 
 	return d().m_main_connection->send([=](std::ostream &n_os) { format_set(n_os, n_key, n_value, n_expire_time, n_condition); })->get_future();
 }
@@ -218,7 +229,10 @@ future_response AsyncClient::set(const std::string &n_key, const std::string &n_
 void AsyncClient::expire(const std::string &n_key, const Duration &n_expire_time, Callback &&n_callback) noexcept {
 
 	MOOSE_ASSERT(d().m_main_connection);
-	MOOSE_ASSERT(!n_key.empty());
+
+	if (n_key.empty()) {
+		BOOST_THROW_EXCEPTION(redis_error() << error_message("Key cannot be empty"));
+	}
 
 	d().m_main_connection->send(
 			[=](std::ostream &n_os) { format_expire(n_os, n_key, n_expire_time); }
@@ -228,7 +242,11 @@ void AsyncClient::expire(const std::string &n_key, const Duration &n_expire_time
 future_response AsyncClient::expire(const std::string &n_key, const Duration &n_expire_time) noexcept {
 
 	MOOSE_ASSERT(d().m_main_connection);
-	MOOSE_ASSERT(!n_key.empty());
+	
+	if (n_key.empty()) {
+		BOOST_THROW_EXCEPTION(redis_error() << error_message("Key cannot be empty"));
+	}
+
 
 	return d().m_main_connection->send([=](std::ostream &n_os) { format_expire(n_os, n_key, n_expire_time); })->get_future();
 }
@@ -236,7 +254,10 @@ future_response AsyncClient::expire(const std::string &n_key, const Duration &n_
 void AsyncClient::del(const std::string &n_key, Callback &&n_callback) noexcept {
 
 	MOOSE_ASSERT(d().m_main_connection);
-	MOOSE_ASSERT(!n_key.empty());
+
+	if (n_key.empty()) {
+		BOOST_THROW_EXCEPTION(redis_error() << error_message("Key cannot be empty"));
+	}
 
 	d().m_main_connection->send(
 			[=] (std::ostream &n_os) { format_del(n_os, n_key); }
@@ -246,7 +267,11 @@ void AsyncClient::del(const std::string &n_key, Callback &&n_callback) noexcept 
 future_response AsyncClient::del(const std::string &n_key) noexcept {
 
 	MOOSE_ASSERT(d().m_main_connection);
-	MOOSE_ASSERT(!n_key.empty());
+
+	if (n_key.empty()) {
+		BOOST_THROW_EXCEPTION(redis_error() << error_message("Key cannot be empty"));
+	}
+
 
 	return d().m_main_connection->send([=] (std::ostream &n_os) { format_del(n_os, n_key); })->get_future();
 }
@@ -254,7 +279,11 @@ future_response AsyncClient::del(const std::string &n_key) noexcept {
 void AsyncClient::exists(const std::string &n_key, Callback &&n_callback) noexcept {
 
 	MOOSE_ASSERT(d().m_main_connection);
-	MOOSE_ASSERT(!n_key.empty());
+	
+	if (n_key.empty()) {
+		BOOST_THROW_EXCEPTION(redis_error() << error_message("Key cannot be empty"));
+	}
+
 
 	d().m_main_connection->send(
 			[=] (std::ostream &n_os) { format_exists(n_os, n_key); }
@@ -264,7 +293,10 @@ void AsyncClient::exists(const std::string &n_key, Callback &&n_callback) noexce
 future_response AsyncClient::exists(const std::string &n_key) noexcept {
 
 	MOOSE_ASSERT(d().m_main_connection);
-	MOOSE_ASSERT(!n_key.empty());
+	
+	if (n_key.empty()) {
+		BOOST_THROW_EXCEPTION(redis_error() << error_message("Key cannot be empty"));
+	}
 
 	return d().m_main_connection->send([=] (std::ostream &n_os) { format_exists(n_os, n_key); })->get_future();
 }
@@ -662,9 +694,50 @@ future_response AsyncClient::publish(const std::string &n_channel_name, const st
 	return d().m_main_connection->send([=] (std::ostream &n_os) { format_publish(n_os, n_channel_name, n_message); })->get_future();
 }
 
+void AsyncClient::debug_sleep(const boost::int64_t n_seconds, Callback &&n_callback) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+
+	d().m_main_connection->send(
+			[=](std::ostream &n_os) { format_debug_sleep(n_os, n_seconds); }
+			, std::move(n_callback));
+}
+
+future_response AsyncClient::debug_sleep(const boost::int64_t n_seconds) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+
+	return d().m_main_connection->send([=](std::ostream &n_os) { format_debug_sleep(n_os, n_seconds); })->get_future();
+}
+
 boost::asio::io_context &AsyncClient::io_context() noexcept {
 
 	return d().m_io_context;
+}
+
+void AsyncClient::release_connection(MRedisConnection *n_connection) noexcept {
+
+	if (d().m_main_connection.get() == n_connection) {
+
+		BOOST_LOG_SEV(logger(), warning) << "Main server connection notified it is not working anymore";
+		d().m_main_connection.reset();
+
+		// I thought about re-connecting right away but decided to do it on demand.
+		// Reason is that whatever caused the connection to drop is very likely still the case,
+		// whereas when I defer re-connect to a later state the condition may have passed.
+		
+
+
+
+	} else if (d().m_pubsub_connection.get() == n_connection) {
+
+		std::cout << "releasing pubsub" << std::endl;
+		d().m_pubsub_connection.reset();
+
+
+	} else {
+		BOOST_LOG_SEV(logger(), error) << "Unknown client connection tried to de-register. This is an error.";
+	}
 }
 
 }

@@ -43,7 +43,7 @@ class BlockingRetriever {
 
 		/*! @brief call either that or get the future
 			@return value if set, otherwise none
-			@throw redis_error
+			@throw redis_error on timeout or underlying condition
 		 */
 		boost::optional<Retval> wait_for_response() {
 			
@@ -67,10 +67,11 @@ class BlockingRetriever {
 		}
 
 		//! @brief use this as a callback in AsyncClient calls
+		//! it returns a no-throw handler which will satisfy the later wait_for_response()
 #if BOOST_MSVC
 		Callback responder() const {
 			
-			static_assert(sizeof(Retval) == -1, "Do not use general reponder function. Specialize for Retval type")
+			static_assert(sizeof(Retval) == -1, "Do not use general responder function. Specialize for Retval type")
 		};
 #else
 		Callback responder() const = delete;
@@ -111,7 +112,7 @@ inline Callback BlockingRetriever<std::string>::responder() const {
 			this->m_promise->set_value(boost::get<std::string>(n_message));
 
 		} catch (const redis_error &err) {
-			this->m_promise->set_exception(boost::copy_exception(err));
+			this->m_promise->set_exception(err);
 		}
 	};
 }
@@ -144,7 +145,7 @@ inline Callback BlockingRetriever<boost::int64_t>::responder() const {
 			this->m_promise->set_value(boost::get<boost::int64_t>(n_message));
 
 		} catch (const redis_error &err) {
-			this->m_promise->set_exception(boost::copy_exception(err));
+			this->m_promise->set_exception(err);
 		}
 	};
 }
@@ -159,7 +160,7 @@ inline Callback BlockingRetriever< std::vector<RedisMessage> >::responder() cons
 		try {
 			// translate the error into an exception that will throw when the caller get()s the future
 			if (is_error(n_message)) {
-				redis_error rerr = boost::get<redis_error>(n_message);
+				const redis_error rerr = boost::get<redis_error>(n_message);
 				throw rerr;
 			}
 
@@ -177,7 +178,7 @@ inline Callback BlockingRetriever< std::vector<RedisMessage> >::responder() cons
 			this->m_promise->set_value(boost::get< std::vector<RedisMessage> >(n_message));
 
 		} catch (const redis_error &err) {
-			this->m_promise->set_exception(std::make_exception_ptr(err));
+			this->m_promise->set_exception(err);
 		}
 	};
 }

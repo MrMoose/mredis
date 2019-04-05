@@ -24,6 +24,7 @@ namespace phx = boost::phoenix;
 using karma::no_delimit;
 using karma::repeat;
 using karma::uint_;
+using karma::long_long;
 using karma::byte_;
 using karma::string;
 using karma::lit;
@@ -36,6 +37,11 @@ void format_ping(std::ostream &n_os) {
 void format_time(std::ostream &n_os) {
 
 	n_os << karma::format("TIME\r\n");
+}
+
+void format_debug_sleep(std::ostream &n_os, const boost::int64_t n_seconds) {
+
+	n_os << karma::format("DEBUG SLEEP " << long_long << "\r\n", n_seconds);
 }
 
 void format_get(std::ostream &n_os, const std::string &n_key) {
@@ -125,7 +131,7 @@ void format_set(std::ostream &n_os, const std::string &n_key, const std::string 
 	}
 }
 
-MREDIS_API void format_expire(std::ostream &n_os, const std::string &n_key, const Duration &n_expire_time) {
+void format_expire(std::ostream &n_os, const std::string &n_key, const Duration &n_expire_time) {
 
 	const unsigned int num_fields = 3;
 	std::string expire_time_str;
@@ -192,8 +198,19 @@ void format_decr(std::ostream &n_os, const std::string &n_key) {
 
 void format_hincrby(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name, const boost::int64_t n_incr_by) {
 
-	n_os << karma::format_delimited("HINCRBY" << karma::string << karma::string << karma::long_long << karma::no_delimit["\r\n"],
-			" ", n_hash_name, n_field_name, n_incr_by);
+	const std::string increment_str = std::to_string(n_incr_by);
+
+	n_os << karma::format_delimited(
+		lit("*4") <<                // Array of 4 fields...
+		lit("$7") <<                // Bulk string of length 7  (length of the term "HINCRBY")
+		lit("HINCRBY") <<           // hincrby command
+		no_delimit['$'] << uint_ << // binary length of hash name
+		string <<                   // hash name
+		no_delimit['$'] << uint_ << // binary length of field name
+		string <<                   // field name
+		no_delimit['$'] << uint_ << // binary length of increment
+		string                      // increment
+		, "\r\n", n_hash_name.size(), n_hash_name, n_field_name.size(), n_field_name, increment_str.size(), increment_str);
 }
 
 void format_hget(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name) {
@@ -305,11 +322,9 @@ void format_eval(std::ostream &n_os, const std::string &n_script, const std::vec
 
 	// According to how I read the protocol specs Redis should accept arrays of mixed types
 	// However whenever I do it I get a protocol error. So I convert the number of arguments
-	// to a string first. This should not be necessary
+	// to a string first. This should not be necessary. If you read this and know the answer, submit pull request
 
-	std::string num_keys_str;
-	std::back_insert_iterator<std::string> out(num_keys_str);
-	karma::generate(out, uint_, n_keys.size());
+	const std::string num_keys_str = std::to_string(n_keys.size());
 
 	const std::size_t num_fields = 3    // EVAL $SCRIPT $NUMBER_OF_KEYS ...
 			+ n_keys.size()             // how many keys
@@ -352,9 +367,7 @@ void format_evalsha(std::ostream &n_os, const std::string &n_sha, const std::vec
 	// However whenever I do it I get a protocol error. So I convert the number of arguments
 	// to a string first. This should not be necessary
 
-	std::string num_keys_str;
-	std::back_insert_iterator<std::string> out(num_keys_str);
-	karma::generate(out, uint_, n_keys.size());
+	const std::string num_keys_str = std::to_string(n_keys.size());
 
 	const std::size_t num_fields = 3    // EVAL $SCRIPT $NUMBER_OF_KEYS ...
 	        + n_keys.size()             // how many keys

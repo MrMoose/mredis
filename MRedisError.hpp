@@ -12,7 +12,7 @@ namespace moose {
 namespace mredis {
 
 //! Some component violated protocol specifications and talked BS
-struct MREDIS_API redis_error : virtual tools::moose_error {
+struct MREDIS_API redis_error : virtual public tools::moose_error {
 
 	char const *what() const noexcept override;
 
@@ -22,7 +22,7 @@ struct MREDIS_API redis_error : virtual tools::moose_error {
 };
 
 //! tag any exception with a human readable error message coming from redis server
-typedef boost::error_info<struct tag_redis_server_message, std::string> redis_server_message;
+using redis_server_message = boost::error_info<struct tag_redis_server_message, std::string>;
 
 }
 }

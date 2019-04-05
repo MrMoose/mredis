@@ -27,6 +27,10 @@ MREDIS_API void format_ping(std::ostream &n_os);
 //! @return array with secs and microsecs 
 MREDIS_API void format_time(std::ostream &n_os);
 
+//! tell the connection to sleep for a bit
+//! @return array with "OK" and seconds 
+MREDIS_API void format_debug_sleep(std::ostream &n_os, const boost::int64_t n_seconds);
+
 //! @return bulk string or nil
 MREDIS_API void format_get(std::ostream &n_os, const std::string &n_key);
 

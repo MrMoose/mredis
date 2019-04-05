@@ -66,7 +66,7 @@ Main access class is `AsyncClient`. It has all redis commands (that I bothered
 to implement yet) exposed as async functions. Most functions come in two flavors:
  * One returning a future result which will be set when the client completes your command
  * An extra overload which accepts a callback lambda that will be executed when your result is ready
-
+ 
 ### Futures
 
 Using the future overloads is convenient and simple.
@@ -99,7 +99,35 @@ if (is_string(msg)) {
 
 ```
 
+### Retrievers
 
+There are two variantions of so-called Retrievers, which are helper structs 
+that ease usage of the futures by providing type checks of the returned values,
+as well as a timeout. They also encapsulate this behavior for use in a multi-threaded
+scenario or a fiber scenario.
+
+When unsure which usage is best for you, this would be the one.
+
+```
+BlockingRetriever< std::string > value_getter{ 2 };
+client.get("test_value", value_getter.responder());
+const boost::optional<std::string> time_values = value_getter.wait_for_response();
+```
+
+This will block this thread for 2 seconds until the value is retrieved and 
+checks the return for being a string. The optional will not be set if the value
+is not present in redis.
+A timeout of two seconds will cause a `redis_error` exception.
+
+Likewise, you can do the same in a fiber, without blocking all of them:
+
+```
+FiberRetriever< std::string > value_getter{ 2 };
+client.get("test_value", value_getter.responder());
+const boost::optional<std::string> time_values = value_getter.wait_for_response();
+```
+
+Behavior is the same.
 
 
 ### Callbacks
