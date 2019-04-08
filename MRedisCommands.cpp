@@ -280,7 +280,7 @@ void format_rpush(std::ostream &n_os, const std::string &n_list_name, const std:
 void format_sadd(std::ostream &n_os, const std::string &n_set_name, const std::string &n_value) {
 
 	n_os << karma::format_delimited(
-		lit("*3") <<                // Array of 2 fields...
+		lit("*3") <<                // Array of 3 fields...
 		lit("$4") <<                // Bulk string of length 4  (length of the term "SADD")
 		lit("SADD") <<              // sadd command
 		no_delimit['$'] << uint_ << // binary length of set name
@@ -293,7 +293,7 @@ void format_sadd(std::ostream &n_os, const std::string &n_set_name, const std::s
 void format_srem(std::ostream &n_os, const std::string &n_set_name, const std::string &n_value) {
 
 	n_os << karma::format_delimited(
-		lit("*3") <<                // Array of 2 fields...
+		lit("*3") <<                // Array of 3 fields...
 		lit("$4") <<                // Bulk string of length 4  (length of the term "SREM")
 		lit("SREM") <<              // srem command
 		no_delimit['$'] << uint_ << // binary length of set name
@@ -301,6 +301,17 @@ void format_srem(std::ostream &n_os, const std::string &n_set_name, const std::s
 		no_delimit['$'] << uint_ << // binary length of value
 		string                      // value
 		, "\r\n", n_set_name.size(), n_set_name, n_value.size(), n_value);
+}
+
+void format_srandmember(std::ostream &n_os, const std::string &n_set_name) {
+
+	n_os << karma::format_delimited(
+		lit("*2") <<                // Array of 2 fields...
+		lit("$11") <<               // Bulk string of length 11  (length of the term "SRANDMEMBER")
+		lit("SRANDMEMBER") <<       // srandmember command
+		no_delimit['$'] << uint_ << // binary length of set name
+		string                      // set name
+		, "\r\n", n_set_name.size(), n_set_name);
 }
 
 void format_smembers(std::ostream &n_os, const std::string &n_set_name) {
