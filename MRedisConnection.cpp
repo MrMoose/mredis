@@ -53,11 +53,14 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 
 	// Set a deadline for the connect operation.
 	m_connect_timeout.expires_after(std::chrono::seconds(MREDIS_CONNECT_TIMEOUT));
+	// Initially start the timeout handlers.
+	m_connect_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_connect_deadline(n_error); });
 
 	ip::tcp::resolver resolver(m_parent.io_context());
 	ip::tcp::resolver::query query(n_server, boost::lexical_cast<std::string>(n_port), ip::tcp::resolver::query::numeric_service);
 	ip::tcp::resolver::results_type resolved_endpoints = resolver.resolve(query);
 	if (resolved_endpoints.empty()) {
+		m_connect_timeout.cancel();
 		BOOST_THROW_EXCEPTION(network_error() << error_message("Cannot resolve host name") << error_argument(n_server));
 	}
 
@@ -69,8 +72,7 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 		[this, promise, n_server](const boost::system::error_code &n_errc, const ip::tcp::endpoint &n_endpoint) {
 
 			// cancel the connection timeout
-			boost::system::error_code ec{ boost::asio::error::operation_aborted };
-			m_connect_timeout.cancel(ec);
+			m_connect_timeout.cancel();
 
 			if (n_errc) {
 				BOOST_LOG_SEV(logger(), warning) << "Could not connect to redis server '" << n_server << "': " << n_errc.message();
@@ -125,9 +127,6 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 					m_read_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_read_deadline(n_error); });
 			});
 	});
-
-	// Initially start the timeout handlers. (Expiry for connect already set)
-	m_connect_timeout.async_wait([this] (const boost::system::error_code &n_error) { this->check_connect_deadline(n_error); });
 
 	// Wait for slightly longer than the actual timeout would be, so the deadline timer can kill the connection,
 	// which would cause the get() to throw, rather than enforcing it here and having dangling stuff
@@ -804,13 +803,6 @@ void MRedisConnection::check_connect_deadline(const boost::system::error_code &n
 		// asynchronous operations are cancelled.
 		BOOST_LOG_SEV(logger(), warning) << "Connect timeout, killing connection";
 		stop();
-
-		// There is no longer an active deadline. The expiry is set to the
-		// maximum time point so that the actor takes no action until a new
-		// deadline is set.
-		m_connect_timeout.expires_at(steady_timer::time_point::max());
-	} else {
-//		BOOST_LOG_SEV(logger(), debug) << "Connection deadline not passed, timeout ignored";
 	}
 }
 

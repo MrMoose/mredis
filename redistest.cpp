@@ -8,6 +8,7 @@
 
 #include "tools/Log.hpp"
 #include "tools/Error.hpp"
+#include "tools/Random.hpp"
 
 #include <boost/config.hpp>
 #include <boost/thread.hpp>
@@ -103,7 +104,7 @@ void expect_null_result(future_response &&n_response) {
 	};
 }
 
-void test_binary_get() {
+bool test_binary_get() {
 	
 	// Test getting and setting a binary value with at least one null byte in it.
 	const std::string binary_sample("Hello\0 World", 12);
@@ -118,11 +119,16 @@ void test_binary_get() {
 	// I expect the response to be a string containing the same binary value
 	if (!is_string(br1)) {
 		std::cerr << "not a string response: " << br1.which() << std::endl;
+		return false;
 	} else {
 		if (binary_sample != boost::get<std::string>(br1)) {
 			std::cerr << "Binary set failed: " << boost::get<std::string>(br1) << std::endl;
+			return false;
 		}
 	}
+
+	client.del("myval:437!:bin_test_key");
+	return true;
 }
 
 // test the eval command a bit. I'll try not to actually test Lua as this is supposed to 
@@ -215,41 +221,55 @@ bool test_lua() {
 }
 
 // Test setting a value with additional parameters
-void test_extended_set_params() {
+bool test_extended_set_params() {
 
-	// Test getting and setting a binary value with at least one null byte in it.
-	const std::string sample("Hello World!");
+	try {
+		// Test getting and setting a binary value with at least one null byte in it.
+		const std::string sample("Hello World!");
 
-	AsyncClient client(server_ip_string);
-	client.connect();
+		AsyncClient client(server_ip_string);
+		client.connect();
 
-	// Delete possibly existing test value
-	client.del("no_exp");
+		// Delete possibly existing test value
+		client.del("no_exp");
 
-	// First try to set value without XX should fail
-	expect_null_result(client.set("no_exp", sample, c_invalid_duration, SetCondition::XX));
+		// First try to set value without XX should fail
+		expect_null_result(client.set("no_exp", sample, c_invalid_duration, SetCondition::XX));
 	
-	// Now set the value with NX should succeed
-	expect_string_result(client.set("no_exp", sample, c_invalid_duration, SetCondition::NX), "OK");
+		// Now set the value with NX should succeed
+		expect_string_result(client.set("no_exp", sample, c_invalid_duration, SetCondition::NX), "OK");
 
-	// Check the value
-	expect_string_result(client.get("no_exp"), sample);
+		// Check the value
+		expect_string_result(client.get("no_exp"), sample);
 	
-	// Now the value should be set. Setting it again with XX should succeed
-	expect_string_result(client.set("no_exp", sample, c_invalid_duration, SetCondition::XX), "OK");
+		// Now the value should be set. Setting it again with XX should succeed
+		expect_string_result(client.set("no_exp", sample, c_invalid_duration, SetCondition::XX), "OK");
 
-	// Delete the value again
-	client.del("no_exp");
+		// Delete the value again
+		client.del("no_exp");
 
-	// And set it with an expiry time of one second
-	expect_string_result(client.set("no_exp", sample, std::chrono::seconds(1)), "OK");
-	expect_string_result(client.get("no_exp"), sample);
+		// And set it with an expiry time of one second
+		expect_string_result(client.set("no_exp", sample, std::chrono::seconds(1)), "OK");
+		expect_string_result(client.get("no_exp"), sample);
 
-	// wait just over a second
-	boost::this_thread::sleep_for(boost::chrono::milliseconds(1100));
+		// wait just over a second
+		boost::this_thread::sleep_for(boost::chrono::milliseconds(1100));
 
-	// and see if the value disappeared
-	expect_null_result(client.get("no_exp"));
+		// and see if the value disappeared
+		expect_null_result(client.get("no_exp"));
+
+		// cleanup
+		client.del("no_exp");
+
+		return true;
+
+	} catch (const moose::mredis::redis_error &merr) {
+		std::cerr << "Error testing extended set parameters: " << boost::diagnostic_information(merr) << std::endl;
+	} catch (...) {
+		std::cerr << "Unhandled exception testing extended set parameters()" << std::endl;
+	}
+
+	return false;
 }
 
 // several test from when this was a new thing
@@ -293,6 +313,7 @@ void test_hincr_by() {
 	// cleanup
 	client.del("myval:437!:test_key");
 	client.del("myhash");
+	client.hdel("myhash", "testfield");
 }
 
 // see if we can really wait on a fiber
@@ -330,7 +351,8 @@ bool test_connection_timeout() {
 		try {
 			std::cerr << "Testing sync connection timeout" << std::endl;
 			
-			// test connection timeout with our load balancer. It should filter redis port inbound
+			// test connection timeout with our load balancer. It should filter redis port inbound,
+			// causing our connection to time out
 			AsyncClient client("TestingInbound-8a9215d5cf5207b9.elb.eu-central-1.amazonaws.com");
 
 			// Should timeout after 2 seconds
@@ -433,7 +455,6 @@ bool test_read_timeout() {
 
 		// Whatever that is, the retriever should have bailed with an exception after 10 seconds
 		if (dur > boost::chrono::seconds(10)) {
-			std::cerr << "Read timeout did not work" << std::endl;
 			return false;
 		}
 
@@ -583,6 +604,122 @@ bool test_read_timeout() {
 	return false;
 }
 
+
+// read timeouts in multi-thread usage
+bool test_mt_read_timeout() {
+
+	AsyncClient client(server_ip_string);
+	client.connect();
+
+	std::atomic<bool> success = true;
+
+	// I am aware that I would have to have a wider lock scope to actually 
+	// have only one cause a timeout. This is not my intention. I shold be able to stomach 
+	// more anyway. I just intend to make it very likely only one does it.
+	std::atomic<bool> timeout_caused = false;
+
+	const boost::chrono::steady_clock::time_point total_start = boost::chrono::steady_clock::now();
+
+	client.set("test:mt:testval", "42");
+
+	// start 10 threads that concurrently run a test similar to the single threaded read timeout test
+	boost::thread_group workers;
+
+	for (unsigned int i = 0; i < 20; i++) {
+
+		workers.add_thread(new boost::thread{ [&] {
+
+			const boost::chrono::steady_clock::time_point thread_start = boost::chrono::steady_clock::now();
+			boost::int64_t current_value = 0;
+
+			// for one minute, we have 10 threads incrementing a value and checking the result or 
+			// trying to cause a timeout, after which we are expected to recover.
+			// Each failure to do so, causes the thread to end
+			while ((boost::chrono::steady_clock::now() - thread_start) < boost::chrono::seconds(10)) {
+
+				// In rare (.001%) of cases I want to cause the timeout, in all others I
+				// just do an increment to cause traffic
+				if (moose::tools::urand(100000) == 1) {
+					if (!timeout_caused) {
+						std::cout << "would cause timeout" << std::endl;
+						timeout_caused.store(true);
+					}
+				} else {
+					// Normal traffic causing incr operation
+					// Each incr operation is either:
+					//   * within a few ms (normal)
+					//   * read timeout hits after 5 seconds        (exception) (caused by endless wait)
+					//   * getter hits wait timeout after 6 seconds (exception)
+					const boost::chrono::steady_clock::time_point get_start = boost::chrono::steady_clock::now();
+					try {				
+						BlockingRetriever< boost::int64_t > incr_getter{ 6 };
+						client.incr("test:mt:testval", incr_getter.responder());
+						const boost::optional<  boost::int64_t > incr_result = incr_getter.wait_for_response();
+						const fsec dur = (boost::chrono::steady_clock::now() - get_start);
+
+						// Whatever that is, the retriever should have bailed with an exception after 10 seconds
+						// I'll treat it as an extra error and break the loop
+						if (dur > boost::chrono::milliseconds(6500)) {
+							std::cerr << "mt read or timeout failed after " << dur.count() << " secs" << std::endl;
+							success.store(false);
+							break;
+						}
+
+						if (!incr_result) {
+							std::cerr << "mt returned without a value after " << dur.count() << " secs" << std::endl;
+							success.store(false);
+							break;
+						} else {
+							if (*incr_result <= current_value) {
+								std::cerr << "incr result not larger than last time: " << *incr_result << " was: " << current_value << std::endl;
+								success.store(false);
+								break;
+							} else {
+								// This should be the 'normal' case
+								current_value = *incr_result;
+							}
+						}
+
+					} catch (const moose::mredis::redis_error &merr) {
+						const fsec dur = (boost::chrono::steady_clock::now() - get_start);
+						if (dur > boost::chrono::milliseconds(4500) && dur < boost::chrono::milliseconds(5500)) {
+							std::cout << "Read timeout worked OK after " << dur.count() << " secs" << std::endl;
+						} else {
+							std::cerr << "Read timeout did not work, exception after " << dur.count() << " secs: " << merr.server_message() << std::endl;
+							success.store(false);
+							break;
+						}
+					} catch (...) {
+						std::cerr << "Unhandled exception caught. Read timeout failed" << std::endl;
+						success.store(false);
+						break;
+					}
+				}
+
+			}
+		} });
+	}
+
+	workers.join_all();
+
+	const fsec total_duration = (boost::chrono::steady_clock::now() - total_start);
+	std::cout << "All threads joined after " << total_duration.count() << " seconds" << std::endl;
+
+	{
+		// new client for cleanup as we don't know in what state the original one is now
+		AsyncClient cleaner(server_ip_string);
+		cleaner.connect();
+		cleaner.del("test:mt:testval");
+	}
+
+	if (!success) {
+		std::cerr << "One or more threads in MT test reported an error" << std::endl;
+		return false;
+	}
+
+	return true;
+}
+
 // see if we can deal with log running operations. I use a script to simulate this
 void test_long_runs() {
 
@@ -631,15 +768,9 @@ void test_long_runs() {
 	// anything other than treating the endless script by either killing it for forcefully shutting down the server.
 	// I don't know yet what and how I should implement
 
-
 	BlockingRetriever<boost::int64_t> dummy_getter(1);   // timeout of one second should be enough
 	client.get("answer", dummy_getter.responder());
 	const boost::optional<boost::int64_t> result = dummy_getter.wait_for_response();
-
-
-
-
-
 
 
 	client.del("answer");
@@ -680,9 +811,25 @@ int main(int argc, char **argv) {
 		const bool perform_long_running_tests = !vm.count("omit");
 		server_ip_string = vm["server"].as<std::string>();
 
-		test_binary_get();
+		goto skip_stuff;
 
-		test_extended_set_params();
+		if (test_binary_get()) {
+			std::cout << "===========================================" << std::endl;
+			std::cout << "Binary getter and setter successful"         << std::endl;
+			std::cout << "===========================================" << std::endl;
+		} else {
+			std::cerr << "Binary getter and setter failed. Bailing..." << std::endl;
+			return EXIT_FAILURE;
+		}
+
+		if (test_extended_set_params()) {
+			std::cout << "===========================================" << std::endl;
+			std::cout << "Extended set parameters successful"          << std::endl;
+			std::cout << "===========================================" << std::endl;
+		} else {
+			std::cerr << "Extended set parameters failed. Bailing..." << std::endl;
+			return EXIT_FAILURE;
+		}
 
 		if (test_lua()) {
 			std::cout << "===========================================" << std::endl;
@@ -714,6 +861,17 @@ int main(int argc, char **argv) {
 				std::cout << "===========================================" << std::endl;
 			} else {
 				std::cerr << "Read timeout test suite failed. Bailing..." << std::endl;
+				return EXIT_FAILURE;
+			}
+
+skip_stuff:
+
+			if (test_mt_read_timeout()) {
+				std::cout << "===========================================" << std::endl;
+				std::cout << "Multithreaded reconnect test suite successful" << std::endl;
+				std::cout << "===========================================" << std::endl;
+			} else {
+				std::cerr << "Multithreaded reconnect test suite failed. Bailing..." << std::endl;
 				return EXIT_FAILURE;
 			}
 		}
