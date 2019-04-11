@@ -614,8 +614,8 @@ bool test_mt_read_timeout() {
 	std::atomic<bool> success = true;
 
 	// I am aware that I would have to have a wider lock scope to actually 
-	// have only one cause a timeout. This is not my intention. I shold be able to stomach 
-	// more anyway. I just intend to make it very likely only one does it.
+	// have only one cause a timeout. This is not my intention. I should be able to stomach 
+	// more anyway. I just intend to make it very likely only one does it to KISS it
 	std::atomic<bool> timeout_caused = false;
 
 	const boost::chrono::steady_clock::time_point total_start = boost::chrono::steady_clock::now();
@@ -635,15 +635,63 @@ bool test_mt_read_timeout() {
 			// for one minute, we have 10 threads incrementing a value and checking the result or 
 			// trying to cause a timeout, after which we are expected to recover.
 			// Each failure to do so, causes the thread to end
-			while ((boost::chrono::steady_clock::now() - thread_start) < boost::chrono::seconds(10)) {
+			while ((boost::chrono::steady_clock::now() - thread_start) < boost::chrono::seconds(60)) {
 
-				// In rare (.001%) of cases I want to cause the timeout, in all others I
+				if (moose::tools::urand(50000) == 1) {
+					std::cout << "Thread " << boost::this_thread::get_id() << " ticking" << std::endl;
+				}
+
+				// In rare (.001%) of cases I want to cause a timeout, in all others I
 				// just do an increment to cause traffic
 				if (moose::tools::urand(100000) == 1) {
-					if (!timeout_caused) {
-						std::cout << "would cause timeout" << std::endl;
-						timeout_caused.store(true);
+
+					if (timeout_caused) {
+						continue;
 					}
+					
+					std::cout << "Causing timeout" << std::endl;
+
+					timeout_caused.store(true);
+
+					const boost::chrono::steady_clock::time_point start = boost::chrono::steady_clock::now();
+
+					try {
+						// Set the wait for the response to 9 seconds
+						BlockingRetriever< std::vector<RedisMessage> > sleep_getter{ 9 };
+						client.debug_sleep(7, sleep_getter.responder());       // read timeout is 5 seconds, so this should trigger it
+						const boost::optional< std::vector<RedisMessage> > sr = sleep_getter.wait_for_response();
+
+						// Now expect the client to have caused the error after approximately 5 seconds
+						// because this is when the timeout hits
+						const fsec dur = (boost::chrono::steady_clock::now() - start);
+
+						// Whatever that is, the retriever should have bailed with an exception after 9 seconds
+						if (dur > boost::chrono::milliseconds(9500)) {
+							std::cerr << "mt read timeout unexpectedly long after " << dur.count() << " secs" << std::endl;
+							success.store(false);
+							break;
+						}
+
+						// We are not supposed to arrive here
+						std::cerr << "Read timeout failed, returned after " << dur.count() << " secs" << std::endl;
+						success.store(false);
+						break;
+
+					} catch (const moose::mredis::redis_error &merr) {
+						const fsec dur = (boost::chrono::steady_clock::now() - start);
+						if (dur > boost::chrono::milliseconds(4500) && dur < boost::chrono::milliseconds(5500)) {
+							std::cout << "Read timeout worked OK after " << dur.count() << " secs" << std::endl;
+						} else {
+							std::cerr << "Read timeout did not work, exception after " << dur.count() << " secs: " << merr.server_message() << std::endl;
+							success.store(false);
+							break;
+						}
+					} catch (...) {
+						std::cerr << "Unhandled exception caught. Read timeout failed" << std::endl;
+						success.store(false);
+						break;
+					}
+
 				} else {
 					// Normal traffic causing incr operation
 					// Each incr operation is either:
@@ -682,7 +730,7 @@ bool test_mt_read_timeout() {
 
 					} catch (const moose::mredis::redis_error &merr) {
 						const fsec dur = (boost::chrono::steady_clock::now() - get_start);
-						if (dur > boost::chrono::milliseconds(4500) && dur < boost::chrono::milliseconds(5500)) {
+						if (dur < boost::chrono::milliseconds(5500)) {
 							std::cout << "Read timeout worked OK after " << dur.count() << " secs" << std::endl;
 						} else {
 							std::cerr << "Read timeout did not work, exception after " << dur.count() << " secs: " << merr.server_message() << std::endl;
@@ -811,8 +859,6 @@ int main(int argc, char **argv) {
 		const bool perform_long_running_tests = !vm.count("omit");
 		server_ip_string = vm["server"].as<std::string>();
 
-		goto skip_stuff;
-
 		if (test_binary_get()) {
 			std::cout << "===========================================" << std::endl;
 			std::cout << "Binary getter and setter successful"         << std::endl;
@@ -863,8 +909,6 @@ int main(int argc, char **argv) {
 				std::cerr << "Read timeout test suite failed. Bailing..." << std::endl;
 				return EXIT_FAILURE;
 			}
-
-skip_stuff:
 
 			if (test_mt_read_timeout()) {
 				std::cout << "===========================================" << std::endl;
