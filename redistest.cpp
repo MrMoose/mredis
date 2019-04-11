@@ -611,12 +611,12 @@ bool test_mt_read_timeout() {
 	AsyncClient client(server_ip_string);
 	client.connect();
 
-	std::atomic<bool> success = true;
+	std::atomic<bool> success{ true };
 
 	// I am aware that I would have to have a wider lock scope to actually 
 	// have only one cause a timeout. This is not my intention. I should be able to stomach 
 	// more anyway. I just intend to make it very likely only one does it to KISS it
-	std::atomic<bool> timeout_caused = false;
+	std::atomic<bool> timeout_caused{ false };
 
 	const boost::chrono::steady_clock::time_point total_start = boost::chrono::steady_clock::now();
 
