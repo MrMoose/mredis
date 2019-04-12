@@ -93,7 +93,7 @@ boost::unique_future<bool> MRedisPubsubConnection::subscribe(const std::string &
 	m_pending_subscriptions.push(new pending_subscription{ n_channel_name, 0, promised_retval });
 	m_subscriptions_pending++;
 
-	m_socket.get_io_context().post([this] () {
+	asio::post(m_parent.io_context(), [this] {
 
 		this->finish_subscriptions();
 	});
@@ -498,7 +498,7 @@ void MRedisPubsubConnection::read_message() {
 		// got outstanding subscriptions
 		if ((m_subscriptions_pending.load() > 0) && (m_streambuf.size() == 0)) {
 			m_buffer_busy = false;
-			m_socket.get_io_context().post([this] () {
+			asio::post(m_parent.io_context(), [this] {
 				this->finish_subscriptions();
 			});
 			return;
