@@ -45,9 +45,9 @@ void MRedisPubsubConnection::stop() noexcept {
 	}
 
 	for (pending_subscription &p : m_pending_confirms) {
-		if (ps->get<2>()) {
-			ps->get<2>()->set_value(false);
-			delete ps->get<2>();
+		if (p.get<2>()) {
+			p.get<2>()->set_value(false);
+	//		delete ps->get<2>();
 		}
 	}
 	m_pending_confirms.clear();
@@ -68,7 +68,6 @@ boost::unique_future<bool> MRedisPubsubConnection::subscribe(const std::string &
 		// First we find a unique ID among our handlers
 		bool duplicate = false;
 		do {
-			bool duplicate = false;
 			*n_id = tools::urand();
 			for (std::map<std::string, SubscriptionMap>::value_type &channel : m_message_handlers) {
 				for (SubscriptionMap::value_type &subs : channel.second) {
