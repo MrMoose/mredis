@@ -109,7 +109,7 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 			}
 
 			// put a wait handler into the 
-			m_outstanding.emplace_back([this, promise](const RedisMessage &n_response) {
+			m_outstanding.emplace_back([promise] (const RedisMessage &n_response) {
 				promise->set_value(n_response);
 			});
 
