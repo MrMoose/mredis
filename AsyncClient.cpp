@@ -484,6 +484,22 @@ future_response AsyncClient::sadd(const std::string &n_set_name, const std::stri
 	return d().m_main_connection->send([=](std::ostream &n_os) { format_sadd(n_os, n_set_name, n_value); })->get_future();
 }
 
+void AsyncClient::scard(const std::string &n_set_name, Callback &&n_callback) noexcept {
+	
+	MOOSE_ASSERT(d().m_main_connection);
+
+	d().m_main_connection->send(
+			[=](std::ostream &n_os) { format_scard(n_os, n_set_name); }
+			, std::move(n_callback));
+}
+
+future_response AsyncClient::scard(const std::string &n_set_name) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+
+	return d().m_main_connection->send([=](std::ostream &n_os) { format_scard(n_os, n_set_name); })->get_future();
+}
+
 void AsyncClient::srem(const std::string &n_set_name, const std::string &n_value, Callback &&n_callback) noexcept {
 
 	MOOSE_ASSERT(d().m_main_connection);

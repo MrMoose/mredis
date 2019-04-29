@@ -290,6 +290,17 @@ void format_sadd(std::ostream &n_os, const std::string &n_set_name, const std::s
 		, "\r\n", n_set_name.size(), n_set_name, n_value.size(), n_value);
 }
 
+void format_scard(std::ostream &n_os, const std::string &n_set_name) {
+
+	n_os << karma::format_delimited(
+		lit("*2") <<                // Array of 2 fields...
+		lit("$5") <<                // Bulk string of length 5  (length of the term "SCARD")
+		lit("SCARD") <<             // scard command
+		no_delimit['$'] << uint_ << // binary length of set name
+		string                      // set name
+		, "\r\n", n_set_name.size(), n_set_name);
+}
+
 void format_srem(std::ostream &n_os, const std::string &n_set_name, const std::string &n_value) {
 
 	n_os << karma::format_delimited(

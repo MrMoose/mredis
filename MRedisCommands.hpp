@@ -81,6 +81,9 @@ MREDIS_API void format_rpush(std::ostream &n_os, const std::string &n_list_name,
 MREDIS_API void format_sadd(std::ostream &n_os, const std::string &n_set_name, const std::string &n_value);
 
 //! @return integer
+MREDIS_API void format_scard(std::ostream &n_os, const std::string &n_set_name);
+
+//! @return integer
 MREDIS_API void format_srem(std::ostream &n_os, const std::string &n_set_name, const std::string &n_value);
 
 //! @return string

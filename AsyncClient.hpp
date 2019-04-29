@@ -367,6 +367,22 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 			@see https://redis.io/commands/sadd
 		*/
 		MREDIS_API future_response sadd(const std::string &n_set_name, const std::string &n_value) noexcept;
+	
+		/*! @brief get cardinality of a set
+			@param n_set_name the name of your set
+	
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/scard
+		 */
+		MREDIS_API void scard(const std::string &n_set_name, Callback &&n_callback) noexcept;
+
+		/*! @brief get cardinality of a set
+			@param n_set_name the name of your set
+
+			@returns future int with number of items or 0 if none, may also hold exception
+			@see https://redis.io/commands/scard
+		*/
+		MREDIS_API future_response scard(const std::string &n_set_name) noexcept;
 
 		/*! @brief set remove
 			@param n_set_name the name of your set
