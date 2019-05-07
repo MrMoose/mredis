@@ -390,6 +390,24 @@ future_response AsyncClient::hset(const std::string &n_hash_name, const std::str
 	return d().m_main_connection->send([=](std::ostream &n_os) { format_hset(n_os, n_hash_name, n_field_name, n_value); })->get_future();
 }
 
+void AsyncClient::hlen(const std::string &n_hash_name, Callback &&n_callback) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT(!n_hash_name.empty());
+
+	d().m_main_connection->send(
+			[=](std::ostream &n_os) { format_hlen(n_os, n_hash_name); }
+			, std::move(n_callback));
+}
+
+future_response AsyncClient::hlen(const std::string &n_hash_name) noexcept {
+
+	MOOSE_ASSERT(d().m_main_connection);
+	MOOSE_ASSERT(!n_hash_name.empty());
+
+	return d().m_main_connection->send([=](std::ostream &n_os) { format_hlen(n_os, n_hash_name); })->get_future();
+}
+
 void AsyncClient::hdel(const std::string &n_hash_name, const std::string &n_field_name, Callback &&n_callback) noexcept {
 
 	MOOSE_ASSERT(d().m_main_connection);

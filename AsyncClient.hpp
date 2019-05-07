@@ -263,6 +263,20 @@ class AsyncClient : private moose::tools::Pimpled<AsyncClientMembers> {
 		                        const std::string &n_field_name,
 		                        const std::string &n_value) noexcept;
 
+		/*! @brief get the number of items in a hash
+			@param n_hash_name assert on empty
+			@param n_callback must be no-throw, will not be executed in caller's thread
+			@see https://redis.io/commands/hlen
+		 */
+		MREDIS_API void hlen(const std::string &n_hash_name, Callback &&n_callback) noexcept;
+
+		/*! @brief get the number of items in a hash
+			@param n_hash_name assert on empty
+			@returns future which will hold response, may also hold exception
+			@see https://redis.io/commands/hset
+		 */
+		MREDIS_API future_response hlen(const std::string &n_hash_name) noexcept;
+
 		/*! @brief delete a hash map field
 			@param n_hash_name assert on empty
 			@param n_field_name assert on empty

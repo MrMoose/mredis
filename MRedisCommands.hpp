@@ -66,6 +66,9 @@ MREDIS_API void format_hget(std::ostream &n_os, const std::string &n_hash_name, 
 MREDIS_API void format_hset(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name, const std::string &n_value);
 
 //! @return integer
+MREDIS_API void format_hlen(std::ostream &n_os, const std::string &n_hash_name);
+
+//! @return integer
 MREDIS_API void format_hdel(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name);
 
 //! @return array

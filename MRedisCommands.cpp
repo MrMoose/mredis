@@ -230,8 +230,8 @@ void format_hset(std::ostream &n_os, const std::string &n_hash_name, const std::
 
 	n_os << karma::format_delimited(
 		lit("*4") <<                // Array of 4 fields...
-		lit("$4") <<                // Bulk string of length 4  (length of the term "HSET")
-		lit("HSET") <<              // set command
+		lit("$4") <<                // Bulk string of length 4 (length of the term "HSET")
+		lit("HSET") <<              // hset command
 		no_delimit['$'] << uint_ << // binary length of hash name
 		string <<                   // hash name
 		no_delimit['$'] << uint_ << // binary length of field name
@@ -239,6 +239,17 @@ void format_hset(std::ostream &n_os, const std::string &n_hash_name, const std::
 		no_delimit['$'] << uint_ << // binary length of value
 		string                      // value
 		, "\r\n", n_hash_name.size(), n_hash_name, n_field_name.size(), n_field_name, n_value.size(), n_value);
+}
+
+void format_hlen(std::ostream &n_os, const std::string &n_hash_name) {
+
+	n_os << karma::format_delimited(
+		lit("*2") <<                // Array of 2 fields...
+		lit("$4") <<                // Bulk string of length 4 (length of the term "HLEN")
+		lit("HLEN") <<              // hlen command
+		no_delimit['$'] << uint_ << // binary length of hash name
+		string                      // hash name
+		, "\r\n", n_hash_name.size(), n_hash_name);
 }
 
 void format_hdel(std::ostream &n_os, const std::string &n_hash_name, const std::string &n_field_name) {
