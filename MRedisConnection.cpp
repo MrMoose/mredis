@@ -28,8 +28,9 @@ MRedisConnection::MRedisConnection(AsyncClient &n_parent)
 		, m_send_retry_timer{ n_parent.io_context() }
 		, m_receive_retry_timer{ n_parent.io_context() }
 		, m_connect_timeout{ n_parent.io_context() }
-		, m_read_timeout{ n_parent.io_context() }
-		, m_write_timeout{ n_parent.io_context() }
+// #no_timeouts disabled
+// 		, m_read_timeout{ n_parent.io_context() }
+// 		, m_write_timeout{ n_parent.io_context() }
 		, m_buffer_busy{ false }
 		, m_status{ Status::Disconnected } {
 
@@ -124,7 +125,8 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 
 					read_response();
 
-					m_read_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_read_deadline(n_error); });
+// #no_timeouts disabled
+//					m_read_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_read_deadline(n_error); });
 			});
 	});
 
@@ -250,7 +252,7 @@ void MRedisConnection::async_connect(const std::string &n_server, const boost::u
 
 					read_response();
 
-					m_read_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_read_deadline(n_error); });
+	//				m_read_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_read_deadline(n_error); });
 			});
 	});
 
@@ -333,8 +335,8 @@ void MRedisConnection::async_reconnect() {
 			send_outstanding_requests();
 
 
-
-			m_read_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_read_deadline(n_error); });
+// #no_timeouts disabled
+//			m_read_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_read_deadline(n_error); });
 
 	});
 
@@ -717,15 +719,16 @@ void MRedisConnection::read_response() noexcept {
 //		BOOST_LOG_SEV(logger(), debug) << "Reading more response";
 	
 
-
-		m_read_timeout.expires_after(std::chrono::seconds(MREDIS_READ_TIMEOUT));
+// #no_timeouts disabled
+//		m_read_timeout.expires_after(std::chrono::seconds(MREDIS_READ_TIMEOUT));
 
 		// read one response and evaluate
 		asio::async_read(m_socket, m_streambuf, asio::transfer_at_least(1),
 			[this](const boost::system::error_code n_errc, const std::size_t) {
 				
 				// let the timeout handler know we have read the response we're expecting
-				m_read_timeout.expires_at(steady_timer::time_point::max());
+// #no_timeouts disabled
+//				m_read_timeout.expires_at(steady_timer::time_point::max());
 
 				if (handle_error(n_errc, "reading response")) {
 					m_buffer_busy = false;
@@ -806,7 +809,7 @@ void MRedisConnection::check_connect_deadline(const boost::system::error_code &n
 	}
 }
 
-
+/* #no_timeouts disabled
 void MRedisConnection::check_read_deadline(const boost::system::error_code &n_error) {
 
 	if (m_status == Status::ShuttingDown || m_status == Status::Shutdown) {
@@ -831,13 +834,15 @@ void MRedisConnection::check_read_deadline(const boost::system::error_code &n_er
 	} else {
 //		BOOST_LOG_SEV(logger(), debug) << "Read deadline not passed, timeout ignored";
 	}
+	
+	
 
 	// Put the actor back to sleep.
 	m_read_timeout.async_wait([this](const boost::system::error_code &e) { this->check_read_deadline(e); });
 }
 
 
-
+*/
 
 
 }

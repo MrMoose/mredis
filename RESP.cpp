@@ -9,6 +9,8 @@
 // #define BOOST_SPIRIT_DEBUG_PRINT_SOME 200
 // #define BOOST_SPIRIT_DEBUG_OUT std::cerr
 
+#include "tools/Log.hpp"
+
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/qi_parse.hpp>
@@ -23,6 +25,8 @@ namespace qi = boost::spirit::qi;
 namespace ascii = qi::ascii;
 namespace karma = boost::spirit::karma;
 namespace phx = boost::phoenix;
+
+using namespace moose::tools;
 
 template <typename InputIterator>
 struct simple_string_parser : qi::grammar<InputIterator, std::string()> {
@@ -248,38 +252,46 @@ struct message_generator : karma::grammar<OutputIterator, RedisMessage()> {
 	karma::rule<OutputIterator, RedisMessage()>    m_start;
 };
 
+// since we should only be parsing from one thread,
+// it should be safe to re-use one object
+using stream_iterator_type = std::istreambuf_iterator<char>;
+message_parser<boost::spirit::multi_pass<stream_iterator_type> > s_response_parser;
+
 RedisMessage parse_one(std::istream &n_is) {
 	
-	typedef std::istreambuf_iterator<char> base_iterator_type;
-	boost::spirit::multi_pass<base_iterator_type> first =
-		boost::spirit::make_default_multi_pass(base_iterator_type(n_is));
-	boost::spirit::multi_pass<base_iterator_type> last =
-		boost::spirit::make_default_multi_pass(base_iterator_type());
+	boost::spirit::multi_pass<stream_iterator_type> first =
+		boost::spirit::make_default_multi_pass(stream_iterator_type(n_is));
+	const boost::spirit::multi_pass<stream_iterator_type> last =
+		boost::spirit::make_default_multi_pass(stream_iterator_type());
 	
-	message_parser<boost::spirit::multi_pass<base_iterator_type> > p;
+	message_parser<boost::spirit::multi_pass<stream_iterator_type> > p;
 
 	RedisMessage result;
-	if (!qi::parse(first, last, p, result) || (first != last)) {
+	if (!qi::parse(first, last, s_response_parser, result) || (first != last)) {
 		return redis_error();
 	} else {
 		return result;
 	}
 }
 
-// since we should only be parsing from one thread,
-// it should be safe to re-use one object
-typedef std::istreambuf_iterator<char> stream_iterator_type;
-message_parser<boost::spirit::multi_pass<stream_iterator_type> > s_response_parser;
-
 bool parse_from_stream(std::istream &n_is, RedisMessage &n_response) noexcept {
 
-	typedef std::istreambuf_iterator<char> base_iterator_type;
-	boost::spirit::multi_pass<base_iterator_type> first =
-		boost::spirit::make_default_multi_pass(base_iterator_type(n_is));
-	boost::spirit::multi_pass<base_iterator_type> last =
-		boost::spirit::make_default_multi_pass(base_iterator_type());
+	boost::spirit::multi_pass<stream_iterator_type> first =
+		boost::spirit::make_default_multi_pass(stream_iterator_type(n_is));
+	const boost::spirit::multi_pass<stream_iterator_type> last =
+		boost::spirit::make_default_multi_pass(stream_iterator_type());
 
-	return qi::parse(first, last, s_response_parser, n_response);
+	const bool retval = qi::parse(first, last, s_response_parser, n_response);
+
+	if (retval && (first != last)) {
+		BOOST_LOG_SEV(logger(), warning) << "First ain't last";
+	}
+
+	if (!retval && (first != last)) {
+		BOOST_LOG_SEV(logger(), warning) << "Falsed first isn't last";
+	}
+
+	return retval;
 }
 
 void generate_to_stream(std::ostream &n_os, const RedisMessage &n_message) {

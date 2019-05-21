@@ -89,7 +89,9 @@ class MRedisConnection {
 
 		//! yeah, this needs refactoring. I don't need two functions for that
 		void check_connect_deadline(const boost::system::error_code &n_error);
-		void check_read_deadline(const boost::system::error_code &n_error);
+
+// #no_timeouts disabled
+//		void check_read_deadline(const boost::system::error_code &n_error);
 
 
 
@@ -112,8 +114,9 @@ class MRedisConnection {
 		boost::asio::steady_timer      m_send_retry_timer;    //!< when buffer is in use for sending, retry after a few micros
 		boost::asio::steady_timer      m_receive_retry_timer; //!< when buffer is in use for receiving, retry after a few micros
 		boost::asio::steady_timer      m_connect_timeout;     //!< we try to adopt a timeout concept but since we are in a 
-		boost::asio::steady_timer      m_read_timeout;        //!< pipelining connection, we always have two concurrent timeouts
-		boost::asio::steady_timer      m_write_timeout;
+
+// 		boost::asio::steady_timer      m_read_timeout;        //!< pipelining connection, we always have two concurrent timeouts
+// 		boost::asio::steady_timer      m_write_timeout;
 
 
 		boost::mutex                   m_request_queue_lock;
