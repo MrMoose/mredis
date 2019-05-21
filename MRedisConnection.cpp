@@ -185,8 +185,7 @@ void MRedisConnection::async_connect(const std::string &n_server, const boost::u
 		[this, n_ret, n_server, start](const boost::system::error_code &n_errc, const ip::tcp::endpoint &n_endpoint) {
 
 			// cancel the connection timeout
-			boost::system::error_code ec{ boost::asio::error::operation_aborted };
-			m_connect_timeout.cancel(ec);
+			m_connect_timeout.cancel();
 
 			if (n_errc) {
 				BOOST_LOG_SEV(logger(), warning) << "Could not connect to redis server '" << n_server << "': " << n_errc.message();
