@@ -29,8 +29,8 @@ MRedisConnection::MRedisConnection(AsyncClient &n_parent)
 		, m_receive_retry_timer{ n_parent.io_context() }
 		, m_connect_timeout{ n_parent.io_context() }
 // #no_timeouts disabled
-// 		, m_read_timeout{ n_parent.io_context() }
-// 		, m_write_timeout{ n_parent.io_context() }
+		, m_read_timeout{ n_parent.io_context() }
+		, m_write_timeout{ n_parent.io_context() }
 		, m_buffer_busy{ false }
 		, m_status{ Status::Disconnected } {
 
@@ -126,7 +126,7 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 					read_response();
 
 // #no_timeouts disabled
-//					m_read_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_read_deadline(n_error); });
+					m_read_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_read_deadline(n_error); });
 			});
 	});
 
@@ -252,7 +252,8 @@ void MRedisConnection::async_connect(const std::string &n_server, const boost::u
 
 					read_response();
 
-	//				m_read_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_read_deadline(n_error); });
+// #no_timeouts disabled
+					m_read_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_read_deadline(n_error); });
 			});
 	});
 
@@ -336,7 +337,7 @@ void MRedisConnection::async_reconnect() {
 
 
 // #no_timeouts disabled
-//			m_read_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_read_deadline(n_error); });
+			m_read_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_read_deadline(n_error); });
 
 	});
 
@@ -580,9 +581,20 @@ void MRedisConnection::send_outstanding_requests() noexcept {
 		// if the streambuf is still in use we have to wait
 		// we have to wait for it to become available. We store both handlers until later
 		if (m_buffer_busy) {
+
+			// If we already have a retry timer set, don't do it again
+			if (m_send_retry_timer.expiry() < steady_timer::clock_type::time_point::max()) {
+
+				// continue waiting for the handler to invoke
+				return;
+			}
+
 			m_send_retry_timer.expires_after(asio::chrono::milliseconds(1));
 			m_send_retry_timer.async_wait(
 				[this](const boost::system::error_code &n_err) {
+
+					// This logically resets the timer to 'unset'
+					m_send_retry_timer.expires_at(steady_timer::clock_type::time_point::max());
 
 					if (!n_err && this->m_status == Status::Pushing) {
 						this->send_outstanding_requests();
@@ -670,12 +682,23 @@ void MRedisConnection::read_response() noexcept {
 		// if the streambuf is in use we cannot push data into it
 		// we have to wait for it to become available. We store both handlers until later
 		if (m_buffer_busy) {
+
+			// If we already have a retry timer set, don't do it again
+			if (m_receive_retry_timer.expiry() < steady_timer::clock_type::time_point::max()) {
+				
+				// continue waiting for the handler to invoke
+				return;
+			}
+
 			// I will only post a wait handler if the queue of outstanding 
 			// responses is not empty to avoid having multiple in flight
 			if (!m_outstanding.empty()) {
 				m_receive_retry_timer.expires_after(asio::chrono::milliseconds(1));
 				m_receive_retry_timer.async_wait(
 					[this](const boost::system::error_code &n_err) {
+
+						// This logically resets the timer to 'unset'
+						m_receive_retry_timer.expires_at(steady_timer::clock_type::time_point::max());
 
 						if (!n_err && this->m_status == Status::Pushing) {
 							this->read_response();
@@ -720,7 +743,7 @@ void MRedisConnection::read_response() noexcept {
 	
 
 // #no_timeouts disabled
-//		m_read_timeout.expires_after(std::chrono::seconds(MREDIS_READ_TIMEOUT));
+		m_read_timeout.expires_after(std::chrono::seconds(MREDIS_READ_TIMEOUT));
 
 		// read one response and evaluate
 		asio::async_read(m_socket, m_streambuf, asio::transfer_at_least(1),
@@ -728,7 +751,7 @@ void MRedisConnection::read_response() noexcept {
 				
 				// let the timeout handler know we have read the response we're expecting
 // #no_timeouts disabled
-//				m_read_timeout.expires_at(steady_timer::time_point::max());
+				m_read_timeout.expires_at(steady_timer::time_point::max());
 
 				if (handle_error(n_errc, "reading response")) {
 					m_buffer_busy = false;
@@ -809,7 +832,6 @@ void MRedisConnection::check_connect_deadline(const boost::system::error_code &n
 	}
 }
 
-/* #no_timeouts disabled
 void MRedisConnection::check_read_deadline(const boost::system::error_code &n_error) {
 
 	if (m_status == Status::ShuttingDown || m_status == Status::Shutdown) {
@@ -834,15 +856,11 @@ void MRedisConnection::check_read_deadline(const boost::system::error_code &n_er
 	} else {
 //		BOOST_LOG_SEV(logger(), debug) << "Read deadline not passed, timeout ignored";
 	}
-	
-	
 
 	// Put the actor back to sleep.
 	m_read_timeout.async_wait([this](const boost::system::error_code &e) { this->check_read_deadline(e); });
 }
 
-
-*/
 
 
 }
