@@ -90,10 +90,7 @@ class MRedisConnection {
 		//! yeah, this needs refactoring. I don't need two functions for that
 		void check_connect_deadline(const boost::system::error_code &n_error);
 
-// #no_timeouts disabled
 		void check_read_deadline(const boost::system::error_code &n_error);
-
-
 
 		/*! @brief shut the connection down and try to reconnect until done.
 			must be called by the connection itself, in io_service's thread
