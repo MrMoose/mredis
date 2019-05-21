@@ -283,12 +283,14 @@ bool parse_from_stream(std::istream &n_is, RedisMessage &n_response) noexcept {
 
 	const bool retval = qi::parse(first, last, s_response_parser, n_response);
 
-	if (retval && (first != last)) {
-		BOOST_LOG_SEV(logger(), warning) << "First ain't last";
-	}
+	// This appears to be common and not problematic.
+	// Connection will continue to read
+// 	if (retval && (first != last)) {
+// 		BOOST_LOG_SEV(logger(), warning) << "First ain't last";
+// 	}
 
 	if (!retval && (first != last)) {
-		BOOST_LOG_SEV(logger(), warning) << "Falsed first isn't last";
+		BOOST_LOG_SEV(logger(), warning) << "Falsed first ain't last";
 	}
 
 	return retval;

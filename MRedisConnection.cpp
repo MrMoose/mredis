@@ -428,10 +428,9 @@ void MRedisConnection::stop() noexcept {
 
 	m_outstanding.clear();
 
-	boost::system::error_code ec{ boost::asio::error::operation_aborted };
-	m_send_retry_timer.cancel(ec);
-	m_receive_retry_timer.cancel(ec);
-	m_connect_timeout.cancel(ec);
+	m_send_retry_timer.cancel();
+	m_receive_retry_timer.cancel();
+	m_connect_timeout.cancel();
 
 	// Closing the socket will cause read_response to return its handler with an error
 	boost::system::error_code ignored_error;
