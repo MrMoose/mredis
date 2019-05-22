@@ -44,6 +44,16 @@ void output_int_result(future_response &&n_response) {
 	};
 }
 
+void expect_some_result(future_response &&n_response) {
+
+	if (n_response.wait_for(boost::chrono::seconds(5)) == boost::future_status::timeout) {
+		BOOST_THROW_EXCEPTION(redis_error() << error_message("Timeout expecting value"));
+	}
+
+	// whatever, just return
+	RedisMessage response = n_response.get();
+}
+
 void expect_int_result(future_response &&n_response, const boost::int64_t n_expected_value) {
 
 	RedisMessage response = n_response.get();
@@ -111,7 +121,8 @@ bool test_binary_get() {
 
 	AsyncClient client(server_ip_string);
 	client.connect();
-	client.set("redistest:myval:437!:bin_test_key", binary_sample);
+	
+	expect_string_result(client.set("redistest:myval:437!:bin_test_key", binary_sample), "OK");
 
 	future_response sr1 = client.get("redistest:myval:437!:bin_test_key");
 	RedisMessage br1 = sr1.get();
@@ -170,7 +181,7 @@ bool test_lua() {
 		args.clear();
 
 		// a little more complex script that increases a number of seats and occupies one if available
-		client.set("redistest:used_seats", "3");
+		expect_string_result(client.set("redistest:used_seats", "3"), "OK");
 
 		const std::string add_seat( // It appears as if everything is type-less stored as string. 
 		                        // In order to make Lua know I intend to treat it as a number, I have
@@ -204,10 +215,10 @@ bool test_lua() {
 		expect_null_result(client.get("redistest:seat5"));
 
 		// cleanup
-		client.del("redistest:used_seats");
-		client.del("redistest:seat4");
-		client.del(std::string("redistest:Hel\r\nlo", 17));
-		client.del("redistest:foo");
+		expect_some_result(client.del("redistest:used_seats"));
+		expect_some_result(client.del("redistest:seat4"));
+		expect_some_result(client.del(std::string("redistest:Hel\r\nlo", 17)));
+		expect_some_result(client.del("redistest:foo"));
 
 		return true;
 
@@ -231,36 +242,36 @@ bool test_extended_set_params() {
 		client.connect();
 
 		// Delete possibly existing test value
-		client.del("no_exp");
+		expect_some_result(client.del("redistest:no_exp"));
 
 		// First try to set value without XX should fail
-		expect_null_result(client.set("no_exp", sample, c_invalid_duration, SetCondition::XX));
+		expect_null_result(client.set("redistest:no_exp", sample, c_invalid_duration, SetCondition::XX));
 	
 		// Now set the value with NX should succeed
-		expect_string_result(client.set("no_exp", sample, c_invalid_duration, SetCondition::NX), "OK");
+		expect_string_result(client.set("redistest:no_exp", sample, c_invalid_duration, SetCondition::NX), "OK");
 
 		// Check the value
-		expect_string_result(client.get("no_exp"), sample);
+		expect_string_result(client.get("redistest:no_exp"), sample);
 	
 		// Now the value should be set. Setting it again with XX should succeed
-		expect_string_result(client.set("no_exp", sample, c_invalid_duration, SetCondition::XX), "OK");
+		expect_string_result(client.set("redistest:no_exp", sample, c_invalid_duration, SetCondition::XX), "OK");
 
 		// Delete the value again
-		client.del("no_exp");
-
+		expect_int_result(client.del("redistest:no_exp"), 1);
+		
 		// And set it with an expiry time of one second
-		expect_string_result(client.set("no_exp", sample, std::chrono::seconds(1)), "OK");
-		expect_string_result(client.get("no_exp"), sample);
+		expect_string_result(client.set("redistest:no_exp", sample, std::chrono::seconds(1)), "OK");
+		expect_string_result(client.get("redistest:no_exp"), sample);
 
 		// wait just over a second
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(1100));
 
 		// and see if the value disappeared
-		expect_null_result(client.get("no_exp"));
+		expect_null_result(client.get("redistest:no_exp"));
 
 		// cleanup
-		client.del("no_exp");
-
+		expect_some_result(client.del("redistest:no_exp"));
+	
 		return true;
 
 	} catch (const moose::mredis::redis_error &merr) {
@@ -278,42 +289,42 @@ void test_hincr_by() {
 	AsyncClient client(server_ip_string);
 	client.connect();
 
-	client.hset("myhash", "field", "1");
+	expect_some_result(client.hset("redistest:myhash", "field", "1"));
 
-	expect_int_result(client.hincrby("myhash", "field", 1), 2);
-	expect_int_result(client.hincrby("myhash", "field", 1), 3);
-	expect_int_result(client.hincrby("myhash", "field", 1), 4);
-	expect_int_result(client.hincrby("myhash", "field", 1), 5);
-	expect_int_result(client.hincrby("myhash", "field", 1), 6);
-	expect_int_result(client.hincrby("myhash", "field", 1), 7);
+	expect_int_result(client.hincrby("redistest:myhash", "field", 1), 2);
+	expect_int_result(client.hincrby("redistest:myhash", "field", 1), 3);
+	expect_int_result(client.hincrby("redistest:myhash", "field", 1), 4);
+	expect_int_result(client.hincrby("redistest:myhash", "field", 1), 5);
+	expect_int_result(client.hincrby("redistest:myhash", "field", 1), 6);
+	expect_int_result(client.hincrby("redistest:myhash", "field", 1), 7);
 
 	std::cout << "Wait a sec... " << std::endl;
 	boost::this_thread::sleep_for(boost::chrono::milliseconds(200));
 	std::cout << "Again!" << std::endl;
 
-	output_int_result(client.hincrby("myhash", "field", 1));
-	output_int_result(client.hincrby("myhash", "field", 1));
-	output_int_result(client.hincrby("myhash", "field", 1));
-	output_int_result(client.hincrby("myhash", "field", 1));
-	output_int_result(client.hincrby("myhash", "field", 1));
-	output_int_result(client.hincrby("myhash", "field", 1));
-	output_int_result(client.hincrby("myhash", "field", 1));
+	output_int_result(client.hincrby("redistest:myhash", "field", 1));
+	output_int_result(client.hincrby("redistest:myhash", "field", 1));
+	output_int_result(client.hincrby("redistest:myhash", "field", 1));
+	output_int_result(client.hincrby("redistest:myhash", "field", 1));
+	output_int_result(client.hincrby("redistest:myhash", "field", 1));
+	output_int_result(client.hincrby("redistest:myhash", "field", 1));
+	output_int_result(client.hincrby("redistest:myhash", "field", 1));
 
-	client.hset("myhash", "testfield", "moep");
-	client.hget("myhash", "testfield", [] (const RedisMessage &n_response) {
+	client.hset("redistest:myhash", "testfield", "moep");
+	client.hget("redistest:myhash", "testfield", [] (const RedisMessage &n_response) {
 
 		expect_string_result(n_response, "moep");
 	});
 
 	boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
-	client.set("myval:437!:test_key", "This is my Test!");
+	expect_some_result(client.set("redistest:myval:437!:test_key", "This is my Test!"));
 
-	expect_string_result(client.get("myval:437!:test_key"), "This is my Test!");
+	expect_string_result(client.get("redistest:myval:437!:test_key"), "This is my Test!");
 	
 	// cleanup
-	client.del("myval:437!:test_key");
-	client.del("myhash");
-	client.hdel("myhash", "testfield");
+	expect_some_result(client.del("redistest:myval:437!:test_key"));
+	expect_some_result(client.del("redistest:myhash"));
+	expect_some_result(client.hdel("redistest:myhash", "testfield"));
 }
 
 // see if we can really wait on a fiber
@@ -348,13 +359,21 @@ bool test_larger_binaries_mt() {
 	AsyncClient client(server_ip_string);
 	client.connect();
 
+	// Better do a pre-run cleanup in case previous runs had leftovers
+	for (unsigned int i = 0; i < num_keys; i++) {
+		future_response res = client.del("redistest:" + std::to_string(i));
+		if (res.wait_for(boost::chrono::seconds(15)) == boost::future_status::timeout) {
+			BOOST_THROW_EXCEPTION(redis_error() << error_message("Timeout deleting binary value"));
+		}
+	}
+
 	// prepare some samples to read and write later
 	// They are stored as fixed values of random bytes in a map and then read and written to redis
 	std::map<std::string, std::string> samples;
 
 	for (unsigned int i = 0; i < num_keys; i++) {
 			
-		const boost::uint64_t byte_size = urand(1024, 131072);
+		const boost::uint64_t byte_size = urand(64, 256);
 		std::string sample;
 		sample.reserve(byte_size);
 
@@ -366,9 +385,7 @@ bool test_larger_binaries_mt() {
 		samples["redistest:" + std::to_string(i)] = sample;
 	}
 
-	std::atomic<bool> failed = false;
-
-	const boost::chrono::steady_clock::time_point total_start = boost::chrono::steady_clock::now();
+	std::atomic<bool> failed{ false };
 
 	// start 10 threads that concurrently write and read those samples
 	boost::thread_group workers;
@@ -386,7 +403,7 @@ bool test_larger_binaries_mt() {
 				// Each failure to do so, causes the thread to end
 				while (!failed && (boost::chrono::steady_clock::now() - thread_start) < boost::chrono::seconds(20)) {
 
-					if (urand(40000) == 1) {
+					if (urand(1000) == 1) {
 						std::cout << "Thread " << boost::this_thread::get_id() << " ticking" << std::endl;
 					}
 
@@ -440,7 +457,10 @@ bool test_larger_binaries_mt() {
 
 	// cleanup
 	for (unsigned int i = 0; i < num_keys; i++) {
-		client.del("redistest:" + std::to_string(i));
+		future_response res = client.del("redistest:" + std::to_string(i));
+		if (res.wait_for(boost::chrono::seconds(15)) == boost::future_status::timeout) {
+			BOOST_THROW_EXCEPTION(redis_error() << error_message("Timeout deleting binary value"));
+		}
 	}
 
 	return !failed;
@@ -967,18 +987,16 @@ int main(int argc, char **argv) {
 
 
 
-		if (test_larger_binaries_mt()) {
-			std::cout << "===========================================" << std::endl;
-			std::cout << "Large binaries test suite successful" << std::endl;
-			std::cout << "===========================================" << std::endl;
-		} else {
-			std::cerr << "Large binaries test suite failed. Bailing..." << std::endl;
-			return EXIT_FAILURE;
-		}
-
-
-
-		return EXIT_SUCCESS;
+// 		if (test_larger_binaries_mt()) {
+// 			std::cout << "===========================================" << std::endl;
+// 			std::cout << "Large binaries test suite successful" << std::endl;
+// 			std::cout << "===========================================" << std::endl;
+// 		} else {
+// 			std::cerr << "Large binaries test suite failed. Bailing..." << std::endl;
+// 			return EXIT_FAILURE;
+// 		}
+//
+//		return EXIT_SUCCESS;
 
 
 

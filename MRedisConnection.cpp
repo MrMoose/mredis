@@ -580,6 +580,10 @@ promised_response_ptr MRedisConnection::send(std::function<void(std::ostream &n_
 
 void MRedisConnection::send_outstanding_requests() noexcept {
 
+	if (m_status >= Status::ShuttingDown) {
+		return;
+	}
+
 	try {
 		// if the streambuf is still in use we have to wait
 		// we have to wait for it to become available. We store both handlers until later
@@ -614,7 +618,7 @@ void MRedisConnection::send_outstanding_requests() noexcept {
 
 		// we have waited for our buffer to become available. Right now I assume there is 
 		// no async operation in progress on it
-		MOOSE_ASSERT((!m_send_buffer_busy));
+		MOOSE_ASSERT(!m_send_buffer_busy)
 		m_send_buffer_busy = true;
 
 		{
@@ -627,7 +631,7 @@ void MRedisConnection::send_outstanding_requests() noexcept {
 	//		BOOST_LOG_SEV(logger(), debug) << "Sending " << m_requests_not_sent.size() << " outstanding requests";
 			
 			// MOEP! Please, lockfree! 
-			boost::unique_lock<boost::mutex> slock(m_request_queue_lock);
+//			boost::unique_lock<boost::mutex> slock(m_request_queue_lock);
 
 			// See if we have unsent requests and stream them first in the order they came in
 			for (mrequest &req : m_requests_not_sent) {
@@ -637,10 +641,10 @@ void MRedisConnection::send_outstanding_requests() noexcept {
 
 			m_requests_not_sent.clear();
 		}
-
+		
 		// send the content of the streambuf to redis
 		asio::async_write(m_socket, m_send_streambuf,
-			[this](const boost::system::error_code n_errc, const std::size_t) {
+			[this](const boost::system::error_code n_errc, const std::size_t n_bytes_transferred) {
 
 				m_send_buffer_busy = false;
 				if (handle_error(n_errc, "sending command(s) to server")) {
@@ -692,7 +696,7 @@ void MRedisConnection::read_response() noexcept {
 
 					// this also happens when a new timer is set, e.g. because more requests come in
 					if (n_error == asio::error::operation_aborted) {
-						//BOOST_LOG_SEV(logger(), debug) << "Send retry timer aborted";
+						//BOOST_LOG_SEV(logger(), debug) << "Receive retry timer aborted";
 						return;
 					}
 
@@ -730,7 +734,7 @@ void MRedisConnection::read_response() noexcept {
 		// If there's nothing left to read, exit this strand. We should re-enter
 		// as new incoming request trigger this.
 		if (m_outstanding.empty()) {
-			//BOOST_LOG_SEV(logger(), debug) << "Expecting no more responses. Nothing to read here, move along";
+//			BOOST_LOG_SEV(logger(), debug) << "Expecting no more responses. Nothing to read here, move along";
 			m_receive_timeout.cancel();
 			m_receive_buffer_busy = false;
 			return;
@@ -743,7 +747,7 @@ void MRedisConnection::read_response() noexcept {
 
 		// read one response and evaluate
 		asio::async_read(m_socket, m_receive_streambuf, asio::transfer_at_least(1),
-			[this](const boost::system::error_code n_errc, const std::size_t) {
+			[this](const boost::system::error_code n_errc, const std::size_t n_bytes_transferred) {
 				
 				if (handle_error(n_errc, "reading response")) {
 					m_receive_buffer_busy = false;
@@ -851,7 +855,7 @@ void MRedisConnection::check_read_deadline(const boost::system::error_code &n_er
 		// deadline is set.
 //		m_read_timeout.expires_at(steady_timer::time_point::max());
 	} else {
-		BOOST_LOG_SEV(logger(), debug) << "Read deadline not passed, timeout ignored";
+//		BOOST_LOG_SEV(logger(), debug) << "Read deadline not passed, timeout ignored";
 	}
 
 	// Put the actor back to sleep.
