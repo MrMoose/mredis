@@ -25,7 +25,6 @@ namespace qi = boost::spirit::qi;
 namespace ascii = qi::ascii;
 namespace karma = boost::spirit::karma;
 namespace phx = boost::phoenix;
-
 using namespace moose::tools;
 
 template <typename InputIterator>
@@ -255,7 +254,9 @@ struct message_generator : karma::grammar<OutputIterator, RedisMessage()> {
 // since we should only be parsing from one thread,
 // it should be safe to re-use one object
 using stream_iterator_type = std::istreambuf_iterator<char>;
-message_parser<boost::spirit::multi_pass<stream_iterator_type> > s_response_parser;
+message_parser<boost::spirit::multi_pass<stream_iterator_type> > s_response_stream_parser;
+
+message_parser<const char *> s_response_parser;
 
 RedisMessage parse_one(std::istream &n_is) {
 	
@@ -267,7 +268,7 @@ RedisMessage parse_one(std::istream &n_is) {
 	message_parser<boost::spirit::multi_pass<stream_iterator_type> > p;
 
 	RedisMessage result;
-	if (!qi::parse(first, last, s_response_parser, result) || (first != last)) {
+	if (!qi::parse(first, last, s_response_stream_parser, result) || (first != last)) {
 		return redis_error();
 	} else {
 		return result;
@@ -276,25 +277,46 @@ RedisMessage parse_one(std::istream &n_is) {
 
 bool parse_from_stream(std::istream &n_is, RedisMessage &n_response) noexcept {
 
-	boost::spirit::multi_pass<stream_iterator_type> first =
-		boost::spirit::make_default_multi_pass(stream_iterator_type(n_is));
-	const boost::spirit::multi_pass<stream_iterator_type> last =
-		boost::spirit::make_default_multi_pass(stream_iterator_type());
+// Original code problematic as incomplete parse will consume parts of the stream.
+//
+// 	boost::spirit::multi_pass<stream_iterator_type> first =
+// 		boost::spirit::make_default_multi_pass(stream_iterator_type(n_is));
+// 	const boost::spirit::multi_pass<stream_iterator_type> last =
+// 		boost::spirit::make_default_multi_pass(stream_iterator_type());
+// 
+// 	const bool retval = qi::parse(first, last, s_response_parser, n_response);
+// 
+// 	return retval;
+// 
+//  Until a solution is found I'm gonna have to copy the input buffer and parse from there.
 
-	const bool retval = qi::parse(first, last, s_response_parser, n_response);
+	return false;
+}
 
-	// This appears to be common and not problematic.
-	// Connection will continue to read
-// 	if (retval && (first != last)) {
-// 		BOOST_LOG_SEV(logger(), warning) << "First ain't last";
-// 	}
+bool parse_from_streambuf(boost::asio::streambuf &n_streambuf, RedisMessage &n_response) noexcept {
 
-	if (!retval && (first != last)) {
-		BOOST_LOG_SEV(logger(), warning) << "Falsed first ain't last";
+	if (!n_streambuf.size()) {
+		return false;
+	}
+
+	const char *original_begin = reinterpret_cast<const char *>(n_streambuf.data().data());
+	const char *begin_ptr = original_begin;
+	const char *end_ptr = begin_ptr + n_streambuf.size();
+
+	const bool retval = qi::parse(begin_ptr, end_ptr, s_response_parser, n_response);
+
+	if (retval) {
+		const std::size_t bytes_to_consume = begin_ptr - original_begin;
+		MOOSE_ASSERT(bytes_to_consume)
+
+		// We have parsed one message successfully. This means, begin_ptr 
+		// should now point to where the msg ended. We consume the buffer to remove it
+		n_streambuf.consume(bytes_to_consume);
 	}
 
 	return retval;
 }
+
 
 void generate_to_stream(std::ostream &n_os, const RedisMessage &n_message) {
 

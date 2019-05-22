@@ -13,6 +13,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/variant.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/algorithm/minmax.hpp>
 
 namespace moose {
 namespace mredis {
@@ -25,12 +26,20 @@ namespace ip = asio::ip;
 MRedisConnection::MRedisConnection(AsyncClient &n_parent)
 		: m_parent{ n_parent }
 		, m_socket{ n_parent.io_context() }
+	
+		, m_send_streambuf{ }
+		, m_send_buffer_busy{ false }
 		, m_send_retry_timer{ n_parent.io_context() }
+		, m_send_timeout{ n_parent.io_context() }
+
+		, m_receive_streambuf{ }
+		, m_receive_buffer_busy{ false }
 		, m_receive_retry_timer{ n_parent.io_context() }
+		, m_receive_timeout{ n_parent.io_context() }
+
 		, m_connect_timeout{ n_parent.io_context() }
-		, m_read_timeout{ n_parent.io_context() }
-		, m_write_timeout{ n_parent.io_context() }
-		, m_buffer_busy{ false }
+		
+		
 		, m_status{ Status::Disconnected } {
 
 }
@@ -87,8 +96,7 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 			// of the asynchronous operation. If the socket is closed at this time then
 			// the timeout handler must have run first.
 			if (!m_socket.is_open()) {
-				std::cout << "Sync connect timed out" << std::endl;
-
+			
 				// Example code tried to connect to other endpoints like this:
 				//	start_connect(++endpoint_iter);
 				// I will not do this now and just throw an error
@@ -101,9 +109,9 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 			// send a ping to say hello. Only one ping though, Vassily
 			{
 #ifdef _WIN32
-				std::ostream os(&m_streambuf, std::ostream::binary);
+				std::ostream os(&m_send_streambuf, std::ostream::binary);
 #else
-				std::ostream os(&m_streambuf);
+				std::ostream os(&m_send_streambuf);
 #endif
 				format_ping(os);
 			}
@@ -114,7 +122,7 @@ void MRedisConnection::connect(const std::string &n_server, const boost::uint16_
 			});
 
 			// send the content of the streambuf to redis
-			asio::async_write(m_socket, m_streambuf,
+			asio::async_write(m_socket, m_send_streambuf,
 				[this](const boost::system::error_code n_errc, const std::size_t n_bytes_sent) {
 
 					if (handle_error(n_errc, "sending ping to server")) {
@@ -200,8 +208,6 @@ void MRedisConnection::async_connect(const std::string &n_server, const boost::u
 			// of the asynchronous operation. If the socket is closed at this time then
 			// the timeout handler must have run first.
 			if (!m_socket.is_open()) {
-				std::cout << "Async connect timed out" << std::endl;
-
 				// Example code tried to connect to other endpoints like this:
 				//	start_connect(++endpoint_iter);
 				// I will not do this now and just throw an error
@@ -212,7 +218,7 @@ void MRedisConnection::async_connect(const std::string &n_server, const boost::u
 
 			// send a ping to say hello. Only one ping though, Vassily
 			{
-				std::ostream os(&m_streambuf);
+				std::ostream os(&m_send_streambuf);
 				format_ping(os);
 			}
 
@@ -239,7 +245,7 @@ void MRedisConnection::async_connect(const std::string &n_server, const boost::u
 			});
 
 			// send the content of the streambuf to redis
-			asio::async_write(m_socket, m_streambuf,
+			asio::async_write(m_socket, m_send_streambuf,
 				[this, n_ret](const boost::system::error_code n_errc, const std::size_t n_bytes_sent) {
 
 					if (handle_error(n_errc, "sending ping to server")) {
@@ -511,7 +517,8 @@ void MRedisConnection::shutdown_reconnect() noexcept {
 
 	// Whatever is left in the streambuf is BS now. I want to clear it. There is no described 
 	// way to do this though, so I resort to take all the input sequence
-	m_streambuf.consume(m_streambuf.size());
+	m_send_streambuf.consume(m_send_streambuf.size());
+	m_receive_streambuf.consume(m_receive_streambuf.size());
 
 	BOOST_LOG_SEV(logger(), normal) << "MRedis TCP connection now in shutdown status, ready to reconnect";
 }
@@ -576,7 +583,7 @@ void MRedisConnection::send_outstanding_requests() noexcept {
 	try {
 		// if the streambuf is still in use we have to wait
 		// we have to wait for it to become available. We store both handlers until later
-		if (m_buffer_busy) {
+		if (m_send_buffer_busy) {
 			// If we already have a retry timer set, don't do it again
 			//BOOST_LOG_SEV(logger(), debug) << "Setting send retry timer";
 			m_send_retry_timer.expires_after(asio::chrono::milliseconds(5));
@@ -607,14 +614,14 @@ void MRedisConnection::send_outstanding_requests() noexcept {
 
 		// we have waited for our buffer to become available. Right now I assume there is 
 		// no async operation in progress on it
-		MOOSE_ASSERT((!m_buffer_busy));
-		m_buffer_busy = true;
+		MOOSE_ASSERT((!m_send_buffer_busy));
+		m_send_buffer_busy = true;
 
 		{
 #ifdef _WIN32
-			std::ostream os(&m_streambuf, std::ostream::binary);
+			std::ostream os(&m_send_streambuf, std::ostream::binary);
 #else
-			std::ostream os(&m_streambuf);
+			std::ostream os(&m_send_streambuf);
 #endif
 
 	//		BOOST_LOG_SEV(logger(), debug) << "Sending " << m_requests_not_sent.size() << " outstanding requests";
@@ -632,10 +639,10 @@ void MRedisConnection::send_outstanding_requests() noexcept {
 		}
 
 		// send the content of the streambuf to redis
-		asio::async_write(m_socket, m_streambuf,
+		asio::async_write(m_socket, m_send_streambuf,
 			[this](const boost::system::error_code n_errc, const std::size_t) {
 
-				m_buffer_busy = false;
+				m_send_buffer_busy = false;
 				if (handle_error(n_errc, "sending command(s) to server")) {
 					stop();
 					return;
@@ -669,7 +676,7 @@ void MRedisConnection::read_response() noexcept {
 	try {
 		// if the streambuf is in use we cannot push data into it
 		// we have to wait for it to become available. We store both handlers until later
-		if (m_buffer_busy) {
+		if (m_receive_buffer_busy) {
 			
 			// I will only post a wait handler if the queue of outstanding 
 			// responses is not empty to avoid having multiple in flight
@@ -699,17 +706,16 @@ void MRedisConnection::read_response() noexcept {
 		
 		// we have waited for our buffer to become available. Right now I assume there is 
 		// no async operation in progress on it
-		MOOSE_ASSERT((!m_buffer_busy));
-		m_buffer_busy = true;
+		MOOSE_ASSERT(!m_receive_buffer_busy)
+		m_receive_buffer_busy = true;
 
 		// perhaps we already have bytes to read in our streambuf. If so, I parse those first
-		while (!m_outstanding.empty() && m_streambuf.size()) {
+		while (!m_outstanding.empty() && m_receive_streambuf.size()) {
 		
-			std::istream is(&m_streambuf);
 			RedisMessage r;
 				
 			// As long as we can parse messages from our stream, continue to do so.
-			bool success = parse_from_stream(is, r);
+			bool success = parse_from_streambuf(m_receive_streambuf, r);
 			if (success) {
 				// call the callback which was stored along with the request
 				m_outstanding.front()(r);
@@ -724,29 +730,29 @@ void MRedisConnection::read_response() noexcept {
 		// If there's nothing left to read, exit this strand. We should re-enter
 		// as new incoming request trigger this.
 		if (m_outstanding.empty()) {
-//			BOOST_LOG_SEV(logger(), debug) << "Expecting no more responses. Nothing to read here, move along";
-			m_read_timeout.cancel();
-			m_buffer_busy = false;
+			//BOOST_LOG_SEV(logger(), debug) << "Expecting no more responses. Nothing to read here, move along";
+			m_receive_timeout.cancel();
+			m_receive_buffer_busy = false;
 			return;
 		}
 
 		// Otherwise read more from the socket
 //		BOOST_LOG_SEV(logger(), debug) << "Set new timeout and read more responses";
-		m_read_timeout.expires_after(asio::chrono::seconds(MREDIS_READ_TIMEOUT));
-		m_read_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_read_deadline(n_error); });
+		m_receive_timeout.expires_after(asio::chrono::seconds(MREDIS_READ_TIMEOUT));
+		m_receive_timeout.async_wait([this](const boost::system::error_code &n_error) { this->check_read_deadline(n_error); });
 
 		// read one response and evaluate
-		asio::async_read(m_socket, m_streambuf, asio::transfer_at_least(1),
+		asio::async_read(m_socket, m_receive_streambuf, asio::transfer_at_least(1),
 			[this](const boost::system::error_code n_errc, const std::size_t) {
 				
 				if (handle_error(n_errc, "reading response")) {
-					m_buffer_busy = false;
+					m_receive_buffer_busy = false;
 					BOOST_LOG_SEV(logger(), warning) << "stop connection";
 					stop();
 					return;
 				}
 				
-				m_buffer_busy = false;
+				m_receive_buffer_busy = false;
 
 				if (m_status >= Status::ShuttingDown) {
 					BOOST_LOG_SEV(logger(), normal) << "Shutting down, not reading any more responses. There are " << m_outstanding.size() << " callbacks left";
@@ -833,7 +839,7 @@ void MRedisConnection::check_read_deadline(const boost::system::error_code &n_er
 	// Check whether the deadline has passed. We compare the deadline against
 	// the current time since a new asynchronous operation may have moved the
 	// deadline before this actor had a chance to run.
-	if (m_read_timeout.expiry() <= steady_timer::clock_type::now()) {
+	if (m_receive_timeout.expiry() <= steady_timer::clock_type::now()) {
 		// The deadline has passed. The socket is closed so that any outstanding
 		// asynchronous operations are cancelled.
 		BOOST_LOG_SEV(logger(), normal) << "Read timeout, killing connection for reconnect...";

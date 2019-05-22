@@ -10,6 +10,7 @@
 
 #include <boost/variant.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/asio/streambuf.hpp>
 
 #include <iostream>
 #include <string>
@@ -30,6 +31,11 @@ MREDIS_API RedisMessage parse_one(std::istream &n_is);
 	@return false on cannot parse any
  */
 MREDIS_API bool parse_from_stream(std::istream &n_is, RedisMessage &n_response) noexcept;
+
+/*! Parse one message from the streambuf and consume if successful.
+	@return false on cannot parse any
+ */
+MREDIS_API bool parse_from_streambuf(boost::asio::streambuf &n_streambuf, RedisMessage &n_response) noexcept;
 
 /*! Generate to stream
 	Mostly for testing

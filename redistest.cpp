@@ -111,9 +111,9 @@ bool test_binary_get() {
 
 	AsyncClient client(server_ip_string);
 	client.connect();
-	client.set("myval:437!:bin_test_key", binary_sample);
+	client.set("redistest:myval:437!:bin_test_key", binary_sample);
 
-	future_response sr1 = client.get("myval:437!:bin_test_key");
+	future_response sr1 = client.get("redistest:myval:437!:bin_test_key");
 	RedisMessage br1 = sr1.get();
 
 	// I expect the response to be a string containing the same binary value
@@ -127,7 +127,7 @@ bool test_binary_get() {
 		}
 	}
 
-	client.del("myval:437!:bin_test_key");
+	client.del("redistest:myval:437!:bin_test_key");
 	return true;
 }
 
@@ -141,7 +141,7 @@ bool test_lua() {
 
 		// Very simple set
 		expect_string_result(
-			client.eval("return redis.call('set', 'foo', 'bar')"),
+			client.eval("return redis.call('set', 'redistest:foo', 'bar')"),
 			"OK"
 		);
 
@@ -155,7 +155,7 @@ bool test_lua() {
 		std::vector<std::string> args;
 
 		// Set with binary arguments
-		keys.emplace_back(std::string("Hel\r\nlo", 7));
+		keys.emplace_back(std::string("redistest:Hel\r\nlo", 17));
 		args.emplace_back(std::string("W\0rld", 5));
 
 		expect_string_result(
@@ -164,50 +164,50 @@ bool test_lua() {
 		);
 	
 		// get the binary string back using regular get and expect to be same
-		expect_string_result(client.get(std::string("Hel\r\nlo", 7)), std::string("W\0rld", 5));
+		expect_string_result(client.get(std::string("redistest:Hel\r\nlo", 17)), std::string("W\0rld", 5));
 	
 		keys.clear();
 		args.clear();
 
 		// a little more complex script that increases a number of seats and occupies one if available
-		client.set("used_seats", "3");
+		client.set("redistest:used_seats", "3");
 
 		const std::string add_seat( // It appears as if everything is type-less stored as string. 
 		                        // In order to make Lua know I intend to treat it as a number, I have
 		                        // to explicitly use tonumber()
 			"local used_seats = tonumber(redis.call('get', KEYS[1])) "
-			"if used_seats < 4 then                                  "
-			"    redis.call('incr', KEYS[1])                         "
-			"    redis.call('set', KEYS[2], ARGV[1])                 "
-			"    return 'OK'                                         "
-			"else                                                    "
-			"    return nil                                          "
+			"if used_seats < 4 then "
+				"redis.call('incr', KEYS[1]) "
+				"redis.call('set', KEYS[2], ARGV[1]) "
+				"return 'OK' "
+			"else "
+				"return nil "
 			"end"
 		);
 
-		keys.emplace_back("used_seats");
-		keys.emplace_back("seat4");
+		keys.emplace_back("redistest:used_seats");
+		keys.emplace_back("redistest:seat4");
 
 		args.emplace_back("Moose");
 
 		// This should work once
 		expect_string_result(client.eval(add_seat, keys, args), "OK");
 
-		keys[1] = "seat5";
+		keys[1] = "redistest:seat5";
 		args[0] = "PoorBugger";
 
 		// But not again because all seats are used
 		expect_null_result(client.eval(add_seat, keys, args));
 
 		// Which means, we only have entry one
-		expect_string_result(client.get("seat4"), "Moose");
-		expect_null_result(client.get("seat5"));
+		expect_string_result(client.get("redistest:seat4"), "Moose");
+		expect_null_result(client.get("redistest:seat5"));
 
 		// cleanup
-		client.del("used_seats");
-		client.del("seat4");
-		client.del(std::string("Hel\r\nlo", 7));
-		client.del("foo");
+		client.del("redistest:used_seats");
+		client.del("redistest:seat4");
+		client.del(std::string("redistest:Hel\r\nlo", 17));
+		client.del("redistest:foo");
 
 		return true;
 
@@ -339,6 +339,111 @@ void test_fibers() {
 
 	expect_string_result(prom2->get_future(), "World");
 	expect_string_result(prom1->get_future(), "Hello");
+}
+
+bool test_larger_binaries_mt() {
+
+	const std::size_t num_keys = 10;
+
+	AsyncClient client(server_ip_string);
+	client.connect();
+
+	// prepare some samples to read and write later
+	// They are stored as fixed values of random bytes in a map and then read and written to redis
+	std::map<std::string, std::string> samples;
+
+	for (unsigned int i = 0; i < num_keys; i++) {
+			
+		const boost::uint64_t byte_size = urand(1024, 131072);
+		std::string sample;
+		sample.reserve(byte_size);
+
+		for (unsigned int n = 0; n < byte_size; n++) {
+			sample.push_back(static_cast<char>(urand(0, 255)));
+		}
+
+		// Yes, keys are "0" to "9" as strings
+		samples["redistest:" + std::to_string(i)] = sample;
+	}
+
+	std::atomic<bool> failed = false;
+
+	const boost::chrono::steady_clock::time_point total_start = boost::chrono::steady_clock::now();
+
+	// start 10 threads that concurrently write and read those samples
+	boost::thread_group workers;
+
+	for (unsigned int i = 0; i < 1; i++) {
+
+		workers.add_thread(new boost::thread{ [&] {
+
+			try {
+
+				const boost::chrono::steady_clock::time_point thread_start = boost::chrono::steady_clock::now();
+
+				// for one minute, we have 10 threads incrementing a value and checking the result or 
+				// trying to cause a timeout, after which we are expected to recover.
+				// Each failure to do so, causes the thread to end
+				while (!failed && (boost::chrono::steady_clock::now() - thread_start) < boost::chrono::seconds(20)) {
+
+					if (urand(40000) == 1) {
+						std::cout << "Thread " << boost::this_thread::get_id() << " ticking" << std::endl;
+					}
+
+					// either read or write
+					if (urand(0, 1) == 0) {
+						// write one sample
+						const std::string key = "redistest:" + std::to_string(urand(0, num_keys - 1));
+
+						// throw on not OK
+						expect_string_result(client.set(key, samples[key]), "OK");
+
+					} else {
+						// read one sample
+						const std::string key = "redistest:" + std::to_string(urand(0, num_keys - 1));
+
+						future_response res = client.get(key);
+
+						if (res.wait_for(boost::chrono::seconds(15)) == boost::future_status::timeout) {
+							BOOST_THROW_EXCEPTION(redis_error() << error_message("Timeout getting binary value"));
+						}
+
+						RedisMessage response = res.get();
+
+						if (is_null(response)) {
+							// value not written yet
+							continue;
+						}
+
+						if (is_string(response)) {
+							const std::string str_res = boost::get<std::string>(response);
+							const std::string original_sample = samples[key];
+
+							// compare the string with the original in the map
+							if (original_sample != str_res) {
+								BOOST_THROW_EXCEPTION(redis_error() << error_message("Retrieved binary value does not match original sample"));
+							}
+
+						} else {
+							BOOST_THROW_EXCEPTION(redis_error() << error_message("Retrieved binary value does not match original sample"));
+						}
+					}
+				}
+			} catch (const moose_error &merr) {
+				std::cerr << "Exception in reading / writing large binaries: " << boost::diagnostic_information(merr);
+				failed.store(true);
+			}
+		} } );
+	}
+
+	workers.join_all();
+
+	// cleanup
+	for (unsigned int i = 0; i < num_keys; i++) {
+		client.del("redistest:" + std::to_string(i));
+	}
+
+	return !failed;
 }
 
 using fsec = boost::chrono::duration<float>;
@@ -859,6 +964,26 @@ int main(int argc, char **argv) {
 		const bool perform_long_running_tests = !vm.count("omit");
 		server_ip_string = vm["server"].as<std::string>();
 
+
+
+
+		if (test_larger_binaries_mt()) {
+			std::cout << "===========================================" << std::endl;
+			std::cout << "Large binaries test suite successful" << std::endl;
+			std::cout << "===========================================" << std::endl;
+		} else {
+			std::cerr << "Large binaries test suite failed. Bailing..." << std::endl;
+			return EXIT_FAILURE;
+		}
+
+
+
+		return EXIT_SUCCESS;
+
+
+
+
+
 		if (test_binary_get()) {
 			std::cout << "===========================================" << std::endl;
 			std::cout << "Binary getter and setter successful"         << std::endl;
@@ -891,6 +1016,15 @@ int main(int argc, char **argv) {
 		test_fibers();
 
 		if (perform_long_running_tests) {
+
+			if (test_larger_binaries_mt()) {
+				std::cout << "===========================================" << std::endl;
+				std::cout << "Large binaries test suite successful" << std::endl;
+				std::cout << "===========================================" << std::endl;
+			} else {
+				std::cerr << "Large binaries test suite failed. Bailing..." << std::endl;
+				return EXIT_FAILURE;
+			}
 
 			if (test_connection_timeout()) {
 				std::cout << "===========================================" << std::endl;

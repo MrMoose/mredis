@@ -104,16 +104,19 @@ class MRedisConnection {
 		AsyncClient                   &m_parent;
 		std::string                    m_server_name;
 		boost::uint16_t                m_server_port;
-		boost::asio::ip::tcp::socket   m_socket;              //!< Socket for the connection.	
-		boost::asio::streambuf         m_streambuf;           //!< use for reading and writing both
+		boost::asio::ip::tcp::socket   m_socket;              //!< Socket for the connection
 
-
+		boost::asio::streambuf         m_send_streambuf;      //!< use for writing
+		bool                           m_send_buffer_busy;    //!< streambuf in use
 		boost::asio::steady_timer      m_send_retry_timer;    //!< when buffer is in use for sending, retry after a few micros
-		boost::asio::steady_timer      m_receive_retry_timer; //!< when buffer is in use for receiving, retry after a few micros
-		boost::asio::steady_timer      m_connect_timeout;     //!< we try to adopt a timeout concept but since we are in a 
+		boost::asio::steady_timer      m_send_timeout;
 
-		boost::asio::steady_timer      m_read_timeout;        //!< pipelining connection, we always have two concurrent timeouts
-		boost::asio::steady_timer      m_write_timeout;
+		boost::asio::streambuf         m_receive_streambuf;   //!< use for reading
+		bool                           m_receive_buffer_busy; //!< streambuf in use
+		boost::asio::steady_timer      m_receive_retry_timer; //!< when buffer is in use for receiving, retry after a few micros
+		boost::asio::steady_timer      m_receive_timeout;        //!< pipelining connection, we always have two concurrent timeouts
+
+		boost::asio::steady_timer      m_connect_timeout;     //!< we try to adopt a timeout concept but since we are in a 
 
 
 		boost::mutex                   m_request_queue_lock;
@@ -121,10 +124,9 @@ class MRedisConnection {
 		std::deque<mrequest>           m_requests_not_sent;
 		std::deque<Callback>           m_outstanding;         //!< callbacks that have not been resolved yet. We are waiting for an answer
 
-		bool                           m_buffer_busy;         //!< streambuf in use
+		
 
 		Status                         m_status;              //!< tell where we are in our workflow
-		std::string                    m_serialized_request;  //!< whatever we have to say. I optimize for 1024 bytes
 };
 
 }

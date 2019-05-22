@@ -154,7 +154,7 @@ void MRedisPubsubConnection::finish_subscriptions() {
 	
 	try {
 		// if the streambuf is still in use so we have to wait for it to become available.
-		if (m_buffer_busy) {
+		if (m_send_buffer_busy) {
 			m_send_retry_timer.expires_after(asio::chrono::milliseconds(1));
 			m_send_retry_timer.async_wait(
 				[this] (const boost::system::error_code &n_err) {
@@ -175,11 +175,11 @@ void MRedisPubsubConnection::finish_subscriptions() {
 
 		// we have waited for our buffer to become available. Right now I assume there is 
 		// no async operation in progress on it
-		MOOSE_ASSERT((!m_buffer_busy));
-		m_buffer_busy = true;
+		MOOSE_ASSERT((!m_send_buffer_busy));
+		m_send_buffer_busy = true;
 
 		{
-			std::ostream os(&m_streambuf);
+			std::ostream os(&m_send_streambuf);
 			if (sub->get<1>() != 0) {
 				format_unsubscribe(os, sub->get<0>());
 			} else {
@@ -189,10 +189,10 @@ void MRedisPubsubConnection::finish_subscriptions() {
 
 		// send the content of the streambuf to redis
 		// We also transfer ownership over the subscription
-		asio::async_write(m_socket, m_streambuf,
+		asio::async_write(m_socket, m_send_streambuf,
 			[this, sub] (const boost::system::error_code n_errc, const std::size_t) {
 
-				m_buffer_busy = false;
+				m_send_buffer_busy = false;
 
 				const std::string channel = sub->get<0>();
 				boost::promise<bool> *prm = sub->get<2>();
@@ -460,7 +460,7 @@ void MRedisPubsubConnection::read_message() {
 	try {
 		// if the streambuf is in use we cannot push data into it
 		// we have to wait for it to become available. We store both handlers until later
-		if (m_buffer_busy) {	
+		if (m_send_buffer_busy) {	
 			m_receive_retry_timer.expires_after(asio::chrono::milliseconds(1));
 			m_receive_retry_timer.async_wait(
 				[this] (const boost::system::error_code &n_err) {
@@ -475,13 +475,13 @@ void MRedisPubsubConnection::read_message() {
 
 		// we have waited for our buffer to become available. Right now I assume there is 
 		// no async operation in progress on it
-		MOOSE_ASSERT((!m_buffer_busy));
-		m_buffer_busy = true;
+		MOOSE_ASSERT((!m_send_buffer_busy));
+		m_send_buffer_busy = true;
 
 		// perhaps we already have bytes to read in our streambuf. If so, I parse those first
-		while (m_streambuf.size()) {
+		while (m_send_streambuf.size()) {
 
-			std::istream is(&m_streambuf);
+			std::istream is(&m_send_streambuf);
 			RedisMessage r;
 
 			// As long as we can parse messages from our stream, continue to do so.
@@ -495,8 +495,8 @@ void MRedisPubsubConnection::read_message() {
 
 		// We may have been woken up by a message, only to be able to see if we 
 		// got outstanding subscriptions
-		if ((m_subscriptions_pending.load() > 0) && (m_streambuf.size() == 0)) {
-			m_buffer_busy = false;
+		if ((m_subscriptions_pending.load() > 0) && (m_send_streambuf.size() == 0)) {
+			m_send_buffer_busy = false;
 			asio::post(m_parent.io_context(), [this] {
 				this->finish_subscriptions();
 			});
@@ -505,7 +505,7 @@ void MRedisPubsubConnection::read_message() {
 
 		// handle_message may have caused us to leave pubsub mode by removing the last subscription
 		if (m_status != Status::Pubsub) {
-			m_buffer_busy = false;
+			m_send_buffer_busy = false;
 			return;
 		}
 
@@ -513,10 +513,10 @@ void MRedisPubsubConnection::read_message() {
 	//	BOOST_LOG_SEV(logger(), debug) << "Reading more messages";
 
 		// read one messages and evaluate
-		asio::async_read(m_socket, m_streambuf, asio::transfer_at_least(1),
+		asio::async_read(m_socket, m_send_streambuf, asio::transfer_at_least(1),
 			[this] (const boost::system::error_code n_errc, const std::size_t) {
 
-				m_buffer_busy = false;
+				m_send_buffer_busy = false;
 
 				if (handle_error(n_errc, "reading message")) {
 					stop();
