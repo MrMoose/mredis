@@ -631,7 +631,7 @@ void MRedisConnection::send_outstanding_requests() noexcept {
 	//		BOOST_LOG_SEV(logger(), debug) << "Sending " << m_requests_not_sent.size() << " outstanding requests";
 			
 			// MOEP! Please, lockfree! 
-//			boost::unique_lock<boost::mutex> slock(m_request_queue_lock);
+			boost::unique_lock<boost::mutex> slock(m_request_queue_lock);
 
 			// See if we have unsent requests and stream them first in the order they came in
 			for (mrequest &req : m_requests_not_sent) {
@@ -689,7 +689,7 @@ void MRedisConnection::read_response() noexcept {
 				return;
 			}
 
-			BOOST_LOG_SEV(logger(), debug) << "Setting read retry timer";
+			//BOOST_LOG_SEV(logger(), debug) << "Setting read retry timer";
 			m_receive_retry_timer.expires_after(asio::chrono::milliseconds(5));
 			m_receive_retry_timer.async_wait(
 				[this](const boost::system::error_code &n_error) {

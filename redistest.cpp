@@ -284,7 +284,7 @@ bool test_extended_set_params() {
 }
 
 // several test from when this was a new thing
-void test_hincr_by() {
+bool test_hincr_by() {
 	
 	AsyncClient client(server_ip_string);
 	client.connect();
@@ -325,31 +325,38 @@ void test_hincr_by() {
 	expect_some_result(client.del("redistest:myval:437!:test_key"));
 	expect_some_result(client.del("redistest:myhash"));
 	expect_some_result(client.hdel("redistest:myhash", "testfield"));
+
+	return true;
 }
 
 // see if we can really wait on a fiber
-void test_fibers() {
+bool test_fibers() {
 	
 	// test fiber wait
 	AsyncClient client(server_ip_string);
 	client.connect();
 
-	client.set("fibertest_1", "Hello");
-	client.set("fibertest_2", "World");
+	expect_string_result(client.set("redistest:fibertest_1", "Hello"), "OK");
+	expect_string_result(client.set("redistest:fibertest_2", "World"), "OK");
 
 	std::shared_ptr<FPromisedRedisMessage> prom1(std::make_shared<FPromisedRedisMessage>());
 	std::shared_ptr<FPromisedRedisMessage> prom2(std::make_shared<FPromisedRedisMessage>());
 
-	client.get("fibertest_1", [prom1] (const RedisMessage &n_message) {
+	client.get("redistest:fibertest_1", [prom1] (const RedisMessage &n_message) {
 		prom1->set_value(n_message);
 	});
 
-	client.get("fibertest_2", [prom2] (const RedisMessage &n_message) {
+	client.get("redistest:fibertest_2", [prom2] (const RedisMessage &n_message) {
 		prom2->set_value(n_message);
 	});
 
 	expect_string_result(prom2->get_future(), "World");
 	expect_string_result(prom1->get_future(), "Hello");
+
+	expect_some_result(client.del("redistest:fibertest_1"));
+	expect_some_result(client.del("redistest:fibertest_2"));
+
+	return true;
 }
 
 bool test_larger_binaries_mt() {
@@ -390,7 +397,7 @@ bool test_larger_binaries_mt() {
 	// start 10 threads that concurrently write and read those samples
 	boost::thread_group workers;
 
-	for (unsigned int i = 0; i < 1; i++) {
+	for (unsigned int i = 0; i < 10; i++) {
 
 		workers.add_thread(new boost::thread{ [&] {
 
@@ -398,13 +405,13 @@ bool test_larger_binaries_mt() {
 
 				const boost::chrono::steady_clock::time_point thread_start = boost::chrono::steady_clock::now();
 
-				// for one minute, we have 10 threads incrementing a value and checking the result or 
+				// for 30 seconds, we have 10 threads incrementing a value and checking the result or 
 				// trying to cause a timeout, after which we are expected to recover.
 				// Each failure to do so, causes the thread to end
-				while (!failed && (boost::chrono::steady_clock::now() - thread_start) < boost::chrono::seconds(20)) {
+				while (!failed && (boost::chrono::steady_clock::now() - thread_start) < boost::chrono::seconds(30)) {
 
 					if (urand(1000) == 1) {
-						std::cout << "Thread " << boost::this_thread::get_id() << " ticking" << std::endl;
+						std::cout << ".";
 					}
 
 					// either read or write
@@ -446,6 +453,9 @@ bool test_larger_binaries_mt() {
 						}
 					}
 				}
+
+				std::cout << std::endl;
+
 			} catch (const moose_error &merr) {
 				std::cerr << "Exception in reading / writing large binaries: " << boost::diagnostic_information(merr);
 				failed.store(true);
@@ -984,24 +994,9 @@ int main(int argc, char **argv) {
 		const bool perform_long_running_tests = !vm.count("omit");
 		server_ip_string = vm["server"].as<std::string>();
 
-
-
-
-// 		if (test_larger_binaries_mt()) {
-// 			std::cout << "===========================================" << std::endl;
-// 			std::cout << "Large binaries test suite successful" << std::endl;
-// 			std::cout << "===========================================" << std::endl;
-// 		} else {
-// 			std::cerr << "Large binaries test suite failed. Bailing..." << std::endl;
-// 			return EXIT_FAILURE;
-// 		}
-//
-//		return EXIT_SUCCESS;
-
-
-
-
-
+		std::cout << "===========================================" << std::endl;
+		std::cout << "Testing getter and setter" << std::endl;
+		std::cout << "===========================================" << std::endl;
 		if (test_binary_get()) {
 			std::cout << "===========================================" << std::endl;
 			std::cout << "Binary getter and setter successful"         << std::endl;
@@ -1011,6 +1006,9 @@ int main(int argc, char **argv) {
 			return EXIT_FAILURE;
 		}
 
+		std::cout << "===========================================" << std::endl;
+		std::cout << "Testing extended set parameters" << std::endl;
+		std::cout << "===========================================" << std::endl;
 		if (test_extended_set_params()) {
 			std::cout << "===========================================" << std::endl;
 			std::cout << "Extended set parameters successful"          << std::endl;
@@ -1020,6 +1018,9 @@ int main(int argc, char **argv) {
 			return EXIT_FAILURE;
 		}
 
+		std::cout << "===========================================" << std::endl;
+		std::cout << "Testing Lua eval" << std::endl;
+		std::cout << "===========================================" << std::endl;
 		if (test_lua()) {
 			std::cout << "===========================================" << std::endl;
 			std::cout << "Lua test suite successful" << std::endl;
@@ -1029,12 +1030,35 @@ int main(int argc, char **argv) {
 			return EXIT_FAILURE;
 		}
 
-		test_hincr_by();
+		std::cout << "===========================================" << std::endl;
+		std::cout << "Testing incr_by" << std::endl;
+		std::cout << "===========================================" << std::endl;
+		if (test_hincr_by()) {
+			std::cout << "===========================================" << std::endl;
+			std::cout << "Incrby test suite successful" << std::endl;
+			std::cout << "===========================================" << std::endl;
+		} else {
+			std::cerr << "Incrby test suite failed. Bailing..." << std::endl;
+			return EXIT_FAILURE;
+		}
 
-		test_fibers();
+		std::cout << "===========================================" << std::endl;
+		std::cout << "Testing fibers getter" << std::endl;
+		std::cout << "===========================================" << std::endl;
+		if (test_fibers()) {
+			std::cout << "===========================================" << std::endl;
+			std::cout << "Fibers getter test successful" << std::endl;
+			std::cout << "===========================================" << std::endl;
+		} else {
+			std::cerr << "Fibers getter suite failed. Bailing..." << std::endl;
+			return EXIT_FAILURE;
+		}
 
 		if (perform_long_running_tests) {
-
+		
+			std::cout << "===========================================" << std::endl;
+			std::cout << "Testing larger binaries mt" << std::endl;
+			std::cout << "===========================================" << std::endl;
 			if (test_larger_binaries_mt()) {
 				std::cout << "===========================================" << std::endl;
 				std::cout << "Large binaries test suite successful" << std::endl;
@@ -1044,6 +1068,9 @@ int main(int argc, char **argv) {
 				return EXIT_FAILURE;
 			}
 
+			std::cout << "===========================================" << std::endl;
+			std::cout << "Testing connection timeout" << std::endl;
+			std::cout << "===========================================" << std::endl;
 			if (test_connection_timeout()) {
 				std::cout << "===========================================" << std::endl;
 				std::cout << "Connection timeout test suite successful" << std::endl;
@@ -1053,6 +1080,9 @@ int main(int argc, char **argv) {
 				return EXIT_FAILURE;
 			}
 
+			std::cout << "===========================================" << std::endl;
+			std::cout << "Testing read timeout" << std::endl;
+			std::cout << "===========================================" << std::endl;
 			if (test_read_timeout()) {
 				std::cout << "===========================================" << std::endl;
 				std::cout << "Read timeout test suite successful" << std::endl;
@@ -1062,6 +1092,9 @@ int main(int argc, char **argv) {
 				return EXIT_FAILURE;
 			}
 
+			std::cout << "===========================================" << std::endl;
+			std::cout << "Testing multithreaded read timeout" << std::endl;
+			std::cout << "===========================================" << std::endl;
 			if (test_mt_read_timeout()) {
 				std::cout << "===========================================" << std::endl;
 				std::cout << "Multithreaded reconnect test suite successful" << std::endl;
