@@ -580,9 +580,9 @@ promised_response_ptr MRedisConnection::send(std::function<void(std::ostream &n_
 
 void MRedisConnection::send_outstanding_requests() noexcept {
 
-	if (m_status >= Status::ShuttingDown) {
-		return;
-	}
+// 	if (m_status >= Status::ShuttingDown) {
+// 		return;
+// 	}
 
 	try {
 		// if the streambuf is still in use we have to wait

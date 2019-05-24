@@ -561,7 +561,7 @@ bool test_read_timeout() {
 	AsyncClient client(server_ip_string);
 	client.connect();
 
-	client.set("read_timeout_test_value", "Hello World!");
+	client.set("redistest:timeout_test_value", "Hello World!");
 
 	// OK, now what is the desired behavior?
 	// If a read timeout from the server occurs, I want the client object to continue to exist,
@@ -621,7 +621,7 @@ bool test_read_timeout() {
 	try {
 
 		BlockingRetriever< std::string > value_getter{ 3 };
-		client.get("read_timeout_test_value", value_getter.responder());
+		client.get("redistest:timeout_test_value", value_getter.responder());
 		const boost::optional<std::string> value = value_getter.wait_for_response();
 			
 		const fsec dur = (boost::chrono::steady_clock::now() - start);
@@ -653,21 +653,21 @@ bool test_read_timeout() {
 		return false;
 	}
 
-	client.del("read_timeout_test_value");
+	client.del("redistest:timeout_test_value");
 	try {
 		std::cout << "Testing recovered client" << std::endl;
 
 		// Now do a few more sets and reads, which should now go quickly, as the connection should be stable now
 		start = boost::chrono::steady_clock::now();
 
-		client.set("testvalue", "42");
-		expect_int_result(client.incr("testvalue"), 43);
-		expect_int_result(client.incr("testvalue"), 44);
-		expect_int_result(client.incr("testvalue"), 45);
-		expect_int_result(client.incr("testvalue"), 46);
-		expect_int_result(client.incr("testvalue"), 47);
-		expect_int_result(client.incr("testvalue"), 48);
-		client.del("testvalue");
+		client.set("redistest:testvalue", "42");
+		expect_int_result(client.incr("redistest:testvalue"), 43);
+		expect_int_result(client.incr("redistest:testvalue"), 44);
+		expect_int_result(client.incr("redistest:testvalue"), 45);
+		expect_int_result(client.incr("redistest:testvalue"), 46);
+		expect_int_result(client.incr("redistest:testvalue"), 47);
+		expect_int_result(client.incr("redistest:testvalue"), 48);
+		client.del("redistest:testvalue");
 
 		fsec duration = (boost::chrono::steady_clock::now() - start);
 	
@@ -685,14 +685,14 @@ bool test_read_timeout() {
 		// Now do a few more sets and reads, which should now go quickly, as the connection should still be OK
 		start = boost::chrono::steady_clock::now();
 
-		client.set("testvalue", "42");
-		expect_int_result(client.incr("testvalue"), 43);
-		expect_int_result(client.incr("testvalue"), 44);
-		expect_int_result(client.incr("testvalue"), 45);
-		expect_int_result(client.incr("testvalue"), 46);
-		expect_int_result(client.incr("testvalue"), 47);
-		expect_int_result(client.incr("testvalue"), 48);
-		client.del("testvalue");
+		client.set("redistest:testvalue", "42");
+		expect_int_result(client.incr("redistest:testvalue"), 43);
+		expect_int_result(client.incr("redistest:testvalue"), 44);
+		expect_int_result(client.incr("redistest:testvalue"), 45);
+		expect_int_result(client.incr("redistest:testvalue"), 46);
+		expect_int_result(client.incr("redistest:testvalue"), 47);
+		expect_int_result(client.incr("redistest:testvalue"), 48);
+		client.del("redistest:testvalue");
 
 		duration = (boost::chrono::steady_clock::now() - start);
 
@@ -710,14 +710,14 @@ bool test_read_timeout() {
 		// Now do a few more sets and reads, which should now go quickly, as the connection should still be OK
 		start = boost::chrono::steady_clock::now();
 
-		client.set("testvalue", "23");
-		expect_int_result(client.incr("testvalue"), 24);
-		expect_int_result(client.incr("testvalue"), 25);
-		expect_int_result(client.incr("testvalue"), 26);
-		expect_int_result(client.incr("testvalue"), 27);
-		expect_int_result(client.incr("testvalue"), 28);
-		expect_int_result(client.incr("testvalue"), 29);
-		client.del("testvalue");
+		client.set("redistest:testvalue", "23");
+		expect_int_result(client.incr("redistest:testvalue"), 24);
+		expect_int_result(client.incr("redistest:testvalue"), 25);
+		expect_int_result(client.incr("redistest:testvalue"), 26);
+		expect_int_result(client.incr("redistest:testvalue"), 27);
+		expect_int_result(client.incr("redistest:testvalue"), 28);
+		expect_int_result(client.incr("redistest:testvalue"), 29);
+		client.del("redistest:testvalue");
 
 		duration = (boost::chrono::steady_clock::now() - start);
 		
@@ -755,7 +755,7 @@ bool test_mt_read_timeout() {
 
 	const boost::chrono::steady_clock::time_point total_start = boost::chrono::steady_clock::now();
 
-	client.set("test:mt:testval", "42");
+	client.set("redistest:mt:testval", "42");
 
 	// start 10 threads that concurrently run a test similar to the single threaded read timeout test
 	boost::thread_group workers;
@@ -836,7 +836,7 @@ bool test_mt_read_timeout() {
 					const boost::chrono::steady_clock::time_point get_start = boost::chrono::steady_clock::now();
 					try {				
 						BlockingRetriever< boost::int64_t > incr_getter{ 6 };
-						client.incr("test:mt:testval", incr_getter.responder());
+						client.incr("redistest:mt:testval", incr_getter.responder());
 						const boost::optional<  boost::int64_t > incr_result = incr_getter.wait_for_response();
 						const fsec dur = (boost::chrono::steady_clock::now() - get_start);
 
@@ -892,7 +892,7 @@ bool test_mt_read_timeout() {
 		// new client for cleanup as we don't know in what state the original one is now
 		AsyncClient cleaner(server_ip_string);
 		cleaner.connect();
-		cleaner.del("test:mt:testval");
+		cleaner.del("redistest:mt:testval");
 	}
 
 	if (!success) {
@@ -994,65 +994,61 @@ int main(int argc, char **argv) {
 		const bool perform_long_running_tests = !vm.count("omit");
 		server_ip_string = vm["server"].as<std::string>();
 
+
 		std::cout << "===========================================" << std::endl;
 		std::cout << "Testing getter and setter" << std::endl;
 		std::cout << "===========================================" << std::endl;
-		if (test_binary_get()) {
-			std::cout << "===========================================" << std::endl;
-			std::cout << "Binary getter and setter successful"         << std::endl;
-			std::cout << "===========================================" << std::endl;
-		} else {
+		if (!test_binary_get()) {
 			std::cerr << "Binary getter and setter failed. Bailing..." << std::endl;
 			return EXIT_FAILURE;
 		}
+		std::cout << "===========================================" << std::endl;
+		std::cout << "Binary getter and setter successful"         << std::endl;
+		std::cout << "===========================================" << std::endl;
 
 		std::cout << "===========================================" << std::endl;
 		std::cout << "Testing extended set parameters" << std::endl;
 		std::cout << "===========================================" << std::endl;
-		if (test_extended_set_params()) {
-			std::cout << "===========================================" << std::endl;
-			std::cout << "Extended set parameters successful"          << std::endl;
-			std::cout << "===========================================" << std::endl;
-		} else {
+		if (!test_extended_set_params()) {
 			std::cerr << "Extended set parameters failed. Bailing..." << std::endl;
 			return EXIT_FAILURE;
 		}
+		std::cout << "===========================================" << std::endl;
+		std::cout << "Extended set parameters successful"          << std::endl;
+		std::cout << "===========================================" << std::endl;
 
 		std::cout << "===========================================" << std::endl;
 		std::cout << "Testing Lua eval" << std::endl;
 		std::cout << "===========================================" << std::endl;
-		if (test_lua()) {
-			std::cout << "===========================================" << std::endl;
-			std::cout << "Lua test suite successful" << std::endl;
-			std::cout << "===========================================" << std::endl;
-		} else {
+		if (!test_lua()) {
 			std::cerr << "Lua test suite failed. Bailing..." << std::endl;
 			return EXIT_FAILURE;
 		}
+		std::cout << "===========================================" << std::endl;
+		std::cout << "Lua test suite successful" << std::endl;
+		std::cout << "===========================================" << std::endl;
 
 		std::cout << "===========================================" << std::endl;
 		std::cout << "Testing incr_by" << std::endl;
 		std::cout << "===========================================" << std::endl;
-		if (test_hincr_by()) {
-			std::cout << "===========================================" << std::endl;
-			std::cout << "Incrby test suite successful" << std::endl;
-			std::cout << "===========================================" << std::endl;
-		} else {
+		if (!test_hincr_by()) {
 			std::cerr << "Incrby test suite failed. Bailing..." << std::endl;
 			return EXIT_FAILURE;
 		}
+		std::cout << "===========================================" << std::endl;
+		std::cout << "Incrby test suite successful" << std::endl;
+		std::cout << "===========================================" << std::endl;
 
 		std::cout << "===========================================" << std::endl;
 		std::cout << "Testing fibers getter" << std::endl;
 		std::cout << "===========================================" << std::endl;
-		if (test_fibers()) {
-			std::cout << "===========================================" << std::endl;
-			std::cout << "Fibers getter test successful" << std::endl;
-			std::cout << "===========================================" << std::endl;
-		} else {
+		if (!test_fibers()) {
 			std::cerr << "Fibers getter suite failed. Bailing..." << std::endl;
 			return EXIT_FAILURE;
 		}
+		std::cout << "===========================================" << std::endl;
+		std::cout << "Fibers getter test successful" << std::endl;
+		std::cout << "===========================================" << std::endl;
 
 		if (perform_long_running_tests) {
 		

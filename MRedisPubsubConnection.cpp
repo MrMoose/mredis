@@ -460,7 +460,7 @@ void MRedisPubsubConnection::read_message() {
 	try {
 		// if the streambuf is in use we cannot push data into it
 		// we have to wait for it to become available. We store both handlers until later
-		if (m_send_buffer_busy) {	
+		if (m_receive_buffer_busy) {	
 			m_receive_retry_timer.expires_after(asio::chrono::milliseconds(1));
 			m_receive_retry_timer.async_wait(
 				[this] (const boost::system::error_code &n_err) {
@@ -495,7 +495,7 @@ void MRedisPubsubConnection::read_message() {
 
 		// We may have been woken up by a message, only to be able to see if we 
 		// got outstanding subscriptions
-		if ((m_subscriptions_pending.load() > 0) && (m_send_streambuf.size() == 0)) {
+		if ((m_subscriptions_pending.load() > 0) && (m_receive_streambuf.size() == 0)) {
 			m_send_buffer_busy = false;
 			asio::post(m_parent.io_context(), [this] {
 				this->finish_subscriptions();
@@ -513,10 +513,10 @@ void MRedisPubsubConnection::read_message() {
 	//	BOOST_LOG_SEV(logger(), debug) << "Reading more messages";
 
 		// read one messages and evaluate
-		asio::async_read(m_socket, m_send_streambuf, asio::transfer_at_least(1),
+		asio::async_read(m_socket, m_receive_streambuf, asio::transfer_at_least(1),
 			[this] (const boost::system::error_code n_errc, const std::size_t) {
 
-				m_send_buffer_busy = false;
+				m_receive_buffer_busy = false;
 
 				if (handle_error(n_errc, "reading message")) {
 					stop();
