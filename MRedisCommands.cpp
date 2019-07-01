@@ -436,12 +436,14 @@ void format_evalsha(std::ostream &n_os, const std::string &n_sha, const std::vec
 void format_script_load(std::ostream &n_os, const std::string &n_script) {
 
 	n_os << karma::format_delimited(
-	    lit("*2") <<                // Array of 2 fields...
-	    lit("$11") <<               // Bulk string of length 11  (length of the term "SCRIPT LOAD")
-	    lit("SCRIPT LOAD") <<       // script load command
-	    no_delimit['$'] << uint_ << // binary length of script
-	    string                      // script
-	    , "\r\n", n_script.size(), n_script);
+		lit("*3") <<                // Array of 3 fields...
+		lit("$6") <<                // Bulk string of length 6 (length of the term "SCRIPT")
+		lit("SCRIPT") <<
+		lit("$4") <<                // Bulk string of length 4 (length of the term "LOAD")
+		lit("LOAD") <<              // script load command
+		no_delimit['$'] << uint_ << // binary length of script
+		string                      // script
+		, "\r\n", n_script.size(), n_script);
 }
 
 void format_subscribe(std::ostream &n_os, const std::string &n_channel_name) {
