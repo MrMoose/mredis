@@ -72,8 +72,9 @@ class MRedisConnection {
 			Connected,
 			Pushing,           // normal mode connection
 			Pubsub,            // pubsub connection
+			ShuttingDownReconnect, // going down for reconnect with the intend of restarting 
+			ShutdownReconnect, // down and ready to reconnect 
 			ShuttingDown,
-			ShutdownReconnect, // down because of error or timeout, try to reconnect 
 			Shutdown           // down and out
 		};
 
@@ -99,6 +100,9 @@ class MRedisConnection {
 		 */
 		virtual void shutdown_reconnect() noexcept;
 
+
+		/*! output current status as string */
+		const char *status_string() const noexcept;
 
 
 		AsyncClient                   &m_parent;

@@ -273,7 +273,7 @@ void MRedisConnection::async_reconnect() {
 
 	// #moep delete me or assert when stuff works
 	if (m_status != Status::ShutdownReconnect) {
-		BOOST_LOG_SEV(logger(), error) << "not in reconnect state";
+		BOOST_LOG_SEV(logger(), error) << "not in reconnect state, we are in: " << status_string();
 		return;
 	}
 
@@ -281,9 +281,6 @@ void MRedisConnection::async_reconnect() {
 
 	// Re-initialize the socket as I expect shutdown_reconnect() to leave it closed
 	m_socket = boost::asio::ip::tcp::socket{ m_parent.io_context() };
-
-	// Set a deadline for the connect operation.
-	m_connect_timeout.expires_after(std::chrono::seconds(MREDIS_CONNECT_TIMEOUT));
 
 	m_status = Status::Connecting;
 
@@ -294,9 +291,13 @@ void MRedisConnection::async_reconnect() {
 		BOOST_LOG_SEV(logger(), warning) << "Could not resolve redis endpoints";
 		boost::system::error_code ignored_error;
 		m_socket.close(ignored_error);
+		m_status = Status::ShutdownReconnect;    // we have set our status to connecting earlier
 		asio::post(m_parent.io_context(), [this] { this->async_reconnect(); });
 		return;
 	}
+
+	// Set a deadline for the connect operation.
+	m_connect_timeout.expires_after(std::chrono::seconds(MREDIS_CONNECT_TIMEOUT));
 
 	// So, what is the plan? I am assuming I was called by send_outstanding, which means there's stuff
 	// to be sent but no connection to send it through.
@@ -309,7 +310,7 @@ void MRedisConnection::async_reconnect() {
 
 			// If we encountered an error, we retry too but delete the socket first
 			if (n_errc) {
-				BOOST_LOG_SEV(logger(), warning) << "Could not reconnect to redis server: " << n_errc.message();
+				BOOST_LOG_SEV(logger(), warning) << "Could not reconnect to redis server on '" << n_endpoint << "': " << n_errc.message();
 				boost::system::error_code ignored_error;
 				m_socket.close(ignored_error);
 	
@@ -456,21 +457,21 @@ void MRedisConnection::shutdown_reconnect() noexcept {
 
 	BOOST_LOG_FUNCTION();
 
-	if (m_status == Status::ShuttingDown || m_status == Status::Shutdown) {
+	if (m_status == Status::ShuttingDownReconnect || m_status == Status::ShuttingDown || m_status == Status::Shutdown) {
 		// We may already be shutting down
 		return;
 	}
 
 	// Leave it in this status
-	m_status = Status::ShutdownReconnect;
+	m_status = Status::ShuttingDownReconnect;
 
-	BOOST_LOG_SEV(logger(), normal) << "MRedis TCP connection now shutting down to reconnect";
+	BOOST_LOG_SEV(logger(), normal) << "[Reconnect] TCP connection now shutting down to reconnect";
 
 	// requests we haven't sent yet timeout immediately
 	for (const mrequest &r : m_requests_not_sent) {
 		try {
 			redis_error err;
-			BOOST_LOG_SEV(logger(), normal) << "Reconnect aborting remaining unsent handler";
+			BOOST_LOG_SEV(logger(), normal) << "[Reconnect] aborting remaining unsent handler";
 			err.set_server_message("unsent handler aborted");
 			r.m_callback(err);
 		} catch (const std::exception &sex) {
@@ -481,6 +482,7 @@ void MRedisConnection::shutdown_reconnect() noexcept {
 	}
 
 	m_requests_not_sent.clear();
+	BOOST_LOG_SEV(logger(), debug) << "[Reconnect] Unsent handlers emptied";
 
 	// Post remaining handlers into the owning parent's io_service to be executed with a
 	// timeout exception
@@ -490,7 +492,7 @@ void MRedisConnection::shutdown_reconnect() noexcept {
 	for (const Callback &cb : m_outstanding) {
 		try {
 			redis_error err;
-			BOOST_LOG_SEV(logger(), normal) << "Reconnect aborting remaining handler";
+			BOOST_LOG_SEV(logger(), normal) << "[Reconnect] aborting remaining handler";
 			err.set_server_message("handler aborted");
 			cb(err);
 		} catch (const std::exception &sex) {
@@ -502,10 +504,13 @@ void MRedisConnection::shutdown_reconnect() noexcept {
 
 	// after executing the callbacks with an error, delete them.
 	m_outstanding.clear();
+	BOOST_LOG_SEV(logger(), debug) << "[Reconnect] Outstanding sent handlers emptied with an exception each";
 
 	m_send_retry_timer.cancel();
 	m_receive_retry_timer.cancel();
 	m_connect_timeout.cancel();
+	m_parent.io_context().poll();
+	BOOST_LOG_SEV(logger(), debug) << "[Reconnect] Timers cancelled";
 
 	// Closing the socket will cause read_response to return its handler with an error
 	boost::system::error_code ignored_error;
@@ -514,17 +519,21 @@ void MRedisConnection::shutdown_reconnect() noexcept {
 
 	// which is why we poll it now. We are in io_service's thread
 	m_parent.io_context().poll();
+	BOOST_LOG_SEV(logger(), debug) << "[Reconnect] Polled Q after closing socket";
 
 	// Whatever is left in the streambuf is BS now. I want to clear it. There is no described 
 	// way to do this though, so I resort to take all the input sequence
 	m_send_streambuf.consume(m_send_streambuf.size());
 	m_receive_streambuf.consume(m_receive_streambuf.size());
 
-	BOOST_LOG_SEV(logger(), normal) << "MRedis TCP connection now in shutdown status, ready to reconnect";
+	m_status = Status::ShutdownReconnect;
+
+	BOOST_LOG_SEV(logger(), normal) << "[Reconnect] TCP connection now in shutdown status (" << status_string() << "), ready to reconnect";
+
+	// I'm posting one handler for send_outstanding just in case there are some. 
+	// The handler will do nothing if there's no reason to reconnect right away
+	asio::post(m_parent.io_context(), [this] { this->send_outstanding_requests(); });
 }
-
-
-
 
 void MRedisConnection::send(std::function<void(std::ostream &n_os)> &&n_prepare, Callback &&n_callback) noexcept {
 
@@ -608,13 +617,22 @@ void MRedisConnection::send_outstanding_requests() noexcept {
 			return;
 		}
 
-		if (m_status == Status::ShutdownReconnect) {
-			// we were shutdown by some error condition and try a reconnect
-			BOOST_LOG_SEV(logger(), debug) << "Incoming command triggered reconnect";
-			async_reconnect();
+		if (m_status == Status::ShuttingDownReconnect) {
+			// we are being shut down by some error condition and try a reconnect
+			BOOST_LOG_SEV(logger(), debug) << "send_outstanding idle due to being shut down for reconnect.";
+			return;
+
+		} else if (m_status == Status::ShutdownReconnect) {
+			// we have been shutdown by some error condition and are ready for a reconnect
+			if (m_requests_not_sent.empty()) {
+				BOOST_LOG_SEV(logger(), debug) << "We are shut down for reconnect, no work to be done. I'm outta here.";
+			} else {
+				BOOST_LOG_SEV(logger(), debug) << "We are shut down for reconnect and there's stuff to be sent. Going to reconnect.";
+				async_reconnect();
+			}
+
 			return;
 		}
-
 
 		// we have waited for our buffer to become available. Right now I assume there is 
 		// no async operation in progress on it
@@ -751,8 +769,16 @@ void MRedisConnection::read_response() noexcept {
 				
 				if (handle_error(n_errc, "reading response")) {
 					m_receive_buffer_busy = false;
-					BOOST_LOG_SEV(logger(), warning) << "stop connection";
-					stop();
+
+					if (m_status == Status::ShuttingDownReconnect) {
+						// Our status has been to ShutdownReconnect because the timeout kicked in.
+						// We exit here and rely on the fact that a handler is already posted.
+						BOOST_LOG_SEV(logger(), debug) << "read timeout cancelled read, all good.";
+					} else {
+						BOOST_LOG_SEV(logger(), warning) << "stop connection";
+						stop();
+					}
+
 					return;
 				}
 				
@@ -836,7 +862,7 @@ void MRedisConnection::check_read_deadline(const boost::system::error_code &n_er
 	}
 
 	if (m_status == Status::ShuttingDown || m_status == Status::Shutdown) {
-		BOOST_LOG_SEV(logger(), debug) << "Shutting down, read timeout ignored";
+		BOOST_LOG_SEV(logger(), debug) << "Shutting down, read timeout ignored. We are in status: " << status_string();
 		return;
 	}
 
@@ -863,6 +889,21 @@ void MRedisConnection::check_read_deadline(const boost::system::error_code &n_er
 }
 
 
+const char *MRedisConnection::status_string() const noexcept {
+
+	switch (m_status) {
+		default:                            return "invalid/error";
+		case Status::Disconnected:          return "disconnected";
+		case Status::Connecting:            return "connecting";
+		case Status::Connected:             return "connected";
+		case Status::Pushing:               return "pushing";
+		case Status::Pubsub:                return "pub/sub";
+		case Status::ShuttingDownReconnect: return "shutting down for reconnect";
+		case Status::ShutdownReconnect:     return "shutdown/reconnect";
+		case Status::ShuttingDown:          return "shutting down";
+		case Status::Shutdown:              return "down";
+	}
+}
 
 }
 }
