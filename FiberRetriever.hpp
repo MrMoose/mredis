@@ -35,9 +35,9 @@ class FiberRetriever {
 			@param n_timeout wait for this long before exception is returned 
 		 */
 		FiberRetriever(const unsigned int n_timeout = 3)
-				: m_timeout(n_timeout)
-				, m_promise(new boost::fibers::promise< boost::optional<Retval> >)
-				, m_used(false) {
+				: m_timeout{ n_timeout }
+				, m_promise{ std::make_unique<boost::fibers::promise< boost::optional<Retval> > >() }
+				, m_used{ false } {
 		}
 
 		/*! @brief call either that or get the future
