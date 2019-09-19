@@ -36,7 +36,7 @@ class FiberRetriever {
 		 */
 		FiberRetriever(const unsigned int n_timeout = 3)
 				: m_timeout{ n_timeout }
-				, m_promise{ std::make_unique<boost::fibers::promise< boost::optional<Retval> > >() }
+				, m_promise{ std::make_shared<boost::fibers::promise< boost::optional<Retval> > >() }
 				, m_used{ false } {
 		}
 
@@ -82,14 +82,14 @@ class FiberRetriever {
 
 	private:
 		const unsigned int     m_timeout;
-		std::unique_ptr< boost::fibers::promise< boost::optional<Retval> > > m_promise;
+		std::shared_ptr< boost::fibers::promise< boost::optional<Retval> > > m_promise;
 		std::atomic<bool>      m_used;  //!< to prevent double usage of this object, set to true after use
 };
 
 template<>
 inline Callback FiberRetriever<std::string>::responder() const {
 
-	return [this](const RedisMessage &n_message) {
+	return [promise{ m_promise }](const RedisMessage &n_message) {
 
 		using namespace moose::tools;
 
@@ -101,7 +101,7 @@ inline Callback FiberRetriever<std::string>::responder() const {
 			}
 
 			if (is_null(n_message)) {
-				this->m_promise->set_value(boost::none);
+				promise->set_value(boost::none);
 				return;
 			}
 
@@ -111,10 +111,10 @@ inline Callback FiberRetriever<std::string>::responder() const {
 					<< error_argument(n_message.which()));
 			}
 
-			this->m_promise->set_value(boost::get<std::string>(n_message));
+			promise->set_value(boost::get<std::string>(n_message));
 
 		} catch (const redis_error &err) {
-			this->m_promise->set_exception(std::make_exception_ptr(err));
+			promise->set_exception(std::make_exception_ptr(err));
 		}
 	};
 }
@@ -122,7 +122,7 @@ inline Callback FiberRetriever<std::string>::responder() const {
 template<>
 inline Callback FiberRetriever<boost::int64_t>::responder() const {
 
-	return [this](const RedisMessage &n_message) {
+	return [promise{ m_promise }] (const RedisMessage &n_message) {
 
 		using namespace moose::tools;
 
@@ -134,7 +134,7 @@ inline Callback FiberRetriever<boost::int64_t>::responder() const {
 			}
 
 			if (is_null(n_message)) {
-				this->m_promise->set_value(boost::none);
+				promise->set_value(boost::none);
 				return;
 			}
 
@@ -144,11 +144,10 @@ inline Callback FiberRetriever<boost::int64_t>::responder() const {
 					<< error_argument(n_message.which()));
 			}
 
-			this->m_promise->set_value(boost::get<boost::int64_t>(n_message));
+			promise->set_value(boost::get<boost::int64_t>(n_message));
 
 		} catch (const redis_error &err) {
-
-			this->m_promise->set_exception(std::make_exception_ptr(err));
+			promise->set_exception(std::make_exception_ptr(err));
 		}
 	};
 }
@@ -156,7 +155,7 @@ inline Callback FiberRetriever<boost::int64_t>::responder() const {
 template<>
 inline Callback FiberRetriever< std::vector<RedisMessage> >::responder() const {
 
-	return [this](const RedisMessage &n_message) {
+	return [promise{ m_promise }](const RedisMessage &n_message) {
 
 		using namespace moose::tools;
 
@@ -168,7 +167,7 @@ inline Callback FiberRetriever< std::vector<RedisMessage> >::responder() const {
 			}
 
 			if (is_null(n_message)) {
-				this->m_promise->set_value(boost::none);
+				promise->set_value(boost::none);
 				return;
 			}
 
@@ -178,10 +177,10 @@ inline Callback FiberRetriever< std::vector<RedisMessage> >::responder() const {
 					<< error_argument(n_message.which()));
 			}
 
-			this->m_promise->set_value(boost::get< std::vector<RedisMessage> >(n_message));
+			promise->set_value(boost::get< std::vector<RedisMessage> >(n_message));
 
 		} catch (const redis_error &err) {
-			this->m_promise->set_exception(std::make_exception_ptr(err));
+			promise->set_exception(std::make_exception_ptr(err));
 		}
 	};
 }
