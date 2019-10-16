@@ -531,6 +531,7 @@ bool test_connection_timeout() {
 
 			// this will throw if the connection times out
 			const bool r = ret.get();
+			boost::ignore_unused(r);
 
 			// We do not want to be here
 			std::cerr << "Async connection timeout failed" << std::endl;
@@ -954,7 +955,7 @@ void test_long_runs() {
 	BlockingRetriever<boost::int64_t> dummy_getter(1);   // timeout of one second should be enough
 	client.get("answer", dummy_getter.responder());
 	const boost::optional<boost::int64_t> result = dummy_getter.wait_for_response();
-
+	boost::ignore_unused(result);
 
 	client.del("answer");
 
