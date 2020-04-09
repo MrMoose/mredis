@@ -176,6 +176,14 @@ struct error_parser : qi::grammar<InputIterator, redis_error()> {
 	qi::rule<InputIterator, redis_error()>  m_start;
 };
 
+// phoenix function to extract the server message.
+// A workaround for C++17 and above as phx::bind on the getter function stopped working
+struct get_srv_message {
+	std::string operator()(const redis_error &e) const { return e.server_message(); }
+};
+static const phx::function<get_srv_message> s_srv_msg_extract;
+
+
 template <typename OutputIterator>
 struct error_generator : karma::grammar<OutputIterator, redis_error()> {
 
@@ -184,7 +192,11 @@ struct error_generator : karma::grammar<OutputIterator, redis_error()> {
 		using karma::labels::_1;
 		using karma::labels::_val;
 
-		m_start = '-' << karma::string[_1 = phx::bind(&redis_error::server_message, _val)] << "\r\n";
+	//	m_start = '-' << karma::string[_1 = phx::bind(&redis_error::server_message, _val)] << "\r\n";
+
+		// C++17 note: I had to change to that phoenix function as the bind above wouldn't compile with C++17 or higher
+		// for unknown reasons.
+		m_start = '-' << karma::string[_1 = s_srv_msg_extract(_val)] << "\r\n";
 	}
 
 	karma::rule<OutputIterator, redis_error()> m_start;

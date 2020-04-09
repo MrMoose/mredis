@@ -60,7 +60,7 @@ target_include_directories(mredis
 )
 
 if (${MOOSE_USE_COTIRE})
-    set_property(TARGET mredis PROPERTY CXX_STANDARD 14)
+    set_property(TARGET mredis PROPERTY CXX_STANDARD 17)
     cotire(mredis)
 endif()
 
@@ -76,7 +76,7 @@ target_link_libraries(redistest
 )
 
 if (${MOOSE_USE_COTIRE})
-	set_property(TARGET redistest PROPERTY CXX_STANDARD 14)
+	set_property(TARGET redistest PROPERTY CXX_STANDARD 17)
 	cotire(redistest)
 endif()
 
@@ -87,7 +87,7 @@ target_link_libraries(mt_testsuite
 )
 
 if (${MOOSE_USE_COTIRE})
-	set_property(TARGET mt_testsuite PROPERTY CXX_STANDARD 14)
+	set_property(TARGET mt_testsuite PROPERTY CXX_STANDARD 17)
 	cotire(mt_testsuite)
 endif()
 
@@ -99,7 +99,7 @@ target_link_libraries(fiber_testsuite
 )
 
 if (${MOOSE_USE_COTIRE})
-	set_property(TARGET fiber_testsuite PROPERTY CXX_STANDARD 14)
+	set_property(TARGET fiber_testsuite PROPERTY CXX_STANDARD 17)
 	cotire(fiber_testsuite)
 endif()
 

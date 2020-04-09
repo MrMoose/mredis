@@ -8,6 +8,8 @@
 
 #include "tools/Error.hpp"
 
+#include <string>
+
 namespace moose {
 namespace mredis {
 
