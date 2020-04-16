@@ -23,13 +23,13 @@ namespace mredis {
 
 struct null_result {};
 
-typedef boost::make_recursive_variant<
+using RedisMessage = boost::make_recursive_variant<
 	redis_error,                           // 0 wrapped up exception for error cases
 	std::string,                           // 1 string response  (simple or bulk)
 	boost::int64_t,                        // 2 integer response
 	null_result,                           // 3 null response
 	std::vector<boost::recursive_variant_> // 4 arrays
->::type RedisMessage;
+>::type;
 
 //! convenience type check so you don't have to fuck around with magic numbers like which() does
 inline bool is_error(const RedisMessage &n_message) noexcept {

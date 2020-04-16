@@ -72,14 +72,18 @@ else()
 		"<algorithm>"
 		"<chrono>"
 		"<functional>"
+		"<atomic>"
+		"<optional>"
 		"<boost/asio.hpp>"
-		"<boost/thread/thread.hpp>"
+		"<boost/thread.hpp>"
 		"<boost/spirit/include/qi.hpp>"
 		"<boost/spirit/include/karma.hpp>"
 		"<boost/spirit/include/phoenix.hpp>"
 	)
 	set_target_properties(mredis PROPERTIES UNITY_BUILD ON)
 endif()
+
+set_property(TARGET moose_tools PROPERTY CXX_STANDARD 17)
 
 add_subdirectory(test)
 enable_testing()

@@ -8,12 +8,12 @@
 #include "MRedisConnection.hpp"
 
 #include <boost/asio.hpp>
-#include <boost/atomic.hpp>
 #include <boost/thread/future.hpp>
 #include <boost/lockfree/queue.hpp>
 
 #include <string>
 #include <map>
+#include <atomic>
 
 namespace moose {
 namespace mredis {
@@ -70,7 +70,7 @@ class MRedisPubsubConnection : public MRedisConnection {
 		boost::lockfree::queue<pending_subscription *>                 m_pending_subscriptions;
 	
 		//! this signifies that subscriptions are pending
-		boost::atomic<unsigned int>                                    m_subscriptions_pending;
+		std::atomic<unsigned int>                                      m_subscriptions_pending;
 
 		//! after they were sent, I move the subscription tuple into this vector to await confirmation
 		//! this doesn't need to be locked or lockfree as access should only occur from io_srv threads

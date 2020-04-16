@@ -9,7 +9,6 @@
 #include "MRedisTypes.hpp"
 
 #include <boost/thread.hpp>
-#include <boost/optional.hpp>
 #include <boost/cstdint.hpp>
 
 #include "tools/Assert.hpp"
@@ -17,6 +16,7 @@
 #include <string>
 #include <chrono>
 #include <atomic>
+#include <optional>
 
 namespace moose {
 namespace mredis {
@@ -37,7 +37,7 @@ class BlockingRetriever {
 		 */
 		BlockingRetriever(const unsigned int n_timeout = 3)
 				: m_timeout{ n_timeout }
-				, m_promise{ std::make_shared < boost::promise< boost::optional<Retval> > >() }
+				, m_promise{ std::make_shared < boost::promise< std::optional<Retval> > >() }
 				, m_used{ false } {
 		}
 
@@ -45,13 +45,13 @@ class BlockingRetriever {
 			@return value if set, otherwise none
 			@throw redis_error on timeout or underlying condition
 		 */
-		boost::optional<Retval> wait_for_response() {
+		std::optional<Retval> wait_for_response() {
 			
 			MOOSE_ASSERT_MSG((!m_used), "Double use of BlockingRetriever object");
 
 			using namespace moose::tools;
 
-			boost::unique_future< boost::optional<Retval> > future_value = m_promise->get_future();
+			boost::unique_future< std::optional<Retval> > future_value = m_promise->get_future();
 
 			// Now I think this wait_for would imply a yield... Meaning that other fiber will take over while this one waits
 			if (future_value.wait_for(boost::chrono::seconds(m_timeout)) == boost::future_status::timeout) {
@@ -63,7 +63,7 @@ class BlockingRetriever {
 
 			// Now we must have a value of correct type as our callback already checked for that.
 			// This may still throw however, but redis_error is expected by caller
-			return boost::get< boost::optional<Retval> >(future_value.get());
+			return boost::get< std::optional<Retval> >(future_value.get());
 		}
 
 		//! @brief use this as a callback in AsyncClient calls
@@ -79,7 +79,7 @@ class BlockingRetriever {
 
 	private:
 		const unsigned int     m_timeout;
-		std::shared_ptr< boost::promise< boost::optional<Retval> > > m_promise;
+		std::shared_ptr< boost::promise< std::optional<Retval> > > m_promise;
 		std::atomic<bool>      m_used;  //!< to prevent double usage of this object, set to true after use
 };
 
@@ -99,7 +99,7 @@ inline Callback BlockingRetriever<std::string>::responder() const {
 			}
 
 			if (is_null(n_message)) {
-				promise->set_value(boost::none);
+				promise->set_value(std::nullopt);
 				return;
 			}
 
@@ -132,7 +132,7 @@ inline Callback BlockingRetriever<boost::int64_t>::responder() const {
 			}
 
 			if (is_null(n_message)) {
-				promise->set_value(boost::none);
+				promise->set_value(std::nullopt);
 				return;
 			}
 
@@ -165,7 +165,7 @@ inline Callback BlockingRetriever< std::vector<RedisMessage> >::responder() cons
 			}
 
 			if (is_null(n_message)) {
-				promise->set_value(boost::none);
+				promise->set_value(std::nullopt);
 				return;
 			}
 

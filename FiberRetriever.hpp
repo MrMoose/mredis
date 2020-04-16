@@ -9,14 +9,14 @@
 #include "MRedisTypes.hpp"
 
 #include <boost/fiber/all.hpp>
-#include <boost/optional.hpp>
-#include <boost/cstdint.hpp>
 
 #include "tools/Assert.hpp"
 
 #include <string>
 #include <chrono>
 #include <atomic>
+#include <optional>
+#include <cstdint>
 
 namespace moose {
 namespace mredis {
@@ -36,7 +36,7 @@ class FiberRetriever {
 		 */
 		FiberRetriever(const unsigned int n_timeout = 3)
 				: m_timeout{ n_timeout }
-				, m_promise{ std::make_shared<boost::fibers::promise< boost::optional<Retval> > >() }
+				, m_promise{ std::make_shared<boost::fibers::promise< std::optional<Retval> > >() }
 				, m_used{ false } {
 		}
 
@@ -44,13 +44,13 @@ class FiberRetriever {
 			@return value if set, otherwise none
 			@throw redis_error on timeout or underlying condition
 		 */
-		boost::optional<Retval> wait_for_response() {
+		std::optional<Retval> wait_for_response() {
 			
 			MOOSE_ASSERT_MSG((!m_used), "Double use of FiberRetriever object");
 
 			using namespace moose::tools;
 
-			boost::fibers::future< boost::optional<Retval> > future_value = m_promise->get_future();
+			boost::fibers::future< std::optional<Retval> > future_value = m_promise->get_future();
 
 			// Now I think this wait_for would imply a yield... Meaning that other fiber will take over while this one waits
 			if (future_value.wait_for(std::chrono::seconds(m_timeout)) == boost::fibers::future_status::timeout) {
@@ -62,7 +62,7 @@ class FiberRetriever {
 
 			// Now we must have a value of correct type as our callback already checked for that.
 			// This may still throw however
-			return boost::get< boost::optional<Retval> >(future_value.get());
+			return boost::get< std::optional<Retval> >(future_value.get());
 		}
 
 		/*! @brief use this as a callback in AsyncClient calls
@@ -82,7 +82,7 @@ class FiberRetriever {
 
 	private:
 		const unsigned int     m_timeout;
-		std::shared_ptr< boost::fibers::promise< boost::optional<Retval> > > m_promise;
+		std::shared_ptr< boost::fibers::promise< std::optional<Retval> > > m_promise;
 		std::atomic<bool>      m_used;  //!< to prevent double usage of this object, set to true after use
 };
 
@@ -101,7 +101,7 @@ inline Callback FiberRetriever<std::string>::responder() const {
 			}
 
 			if (is_null(n_message)) {
-				promise->set_value(boost::none);
+				promise->set_value(std::nullopt);
 				return;
 			}
 
@@ -134,7 +134,7 @@ inline Callback FiberRetriever<boost::int64_t>::responder() const {
 			}
 
 			if (is_null(n_message)) {
-				promise->set_value(boost::none);
+				promise->set_value(std::nullopt);
 				return;
 			}
 
@@ -144,7 +144,7 @@ inline Callback FiberRetriever<boost::int64_t>::responder() const {
 					<< error_argument(n_message.which()));
 			}
 
-			promise->set_value(boost::get<boost::int64_t>(n_message));
+			promise->set_value(boost::get<std::int64_t>(n_message));
 
 		} catch (const redis_error &err) {
 			promise->set_exception(std::make_exception_ptr(err));
@@ -167,7 +167,7 @@ inline Callback FiberRetriever< std::vector<RedisMessage> >::responder() const {
 			}
 
 			if (is_null(n_message)) {
-				promise->set_value(boost::none);
+				promise->set_value(std::nullopt);
 				return;
 			}
 

@@ -13,7 +13,6 @@
 
 #include <functional>
 #include <string>
-
 #include <deque>
 
 namespace moose {
