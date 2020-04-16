@@ -584,7 +584,7 @@ bool test_read_timeout() {
 
 		// cause timeout after 5 (command will forcably take 6)
 		client.debug_sleep(7, sleep_getter.responder());                  // read timeout is 5 seconds, so this should trigger it
-		const boost::optional< std::vector<RedisMessage> > sr = sleep_getter.wait_for_response();
+		const std::optional< std::vector<RedisMessage> > sr = sleep_getter.wait_for_response();
 			
 		// Now expect the client to have caused the error after approximately 5 seconds
 		const fsec dur = (boost::chrono::steady_clock::now() - start);
@@ -623,7 +623,7 @@ bool test_read_timeout() {
 
 		BlockingRetriever< std::string > value_getter{ 3 };
 		client.get("redistest:timeout_test_value", value_getter.responder());
-		const boost::optional<std::string> value = value_getter.wait_for_response();
+		const std::optional<std::string> value = value_getter.wait_for_response();
 			
 		const fsec dur = (boost::chrono::steady_clock::now() - start);
 
@@ -795,7 +795,7 @@ bool test_mt_read_timeout() {
 						// Set the wait for the response to 9 seconds
 						BlockingRetriever< std::vector<RedisMessage> > sleep_getter{ 9 };
 						client.debug_sleep(7, sleep_getter.responder());       // read timeout is 5 seconds, so this should trigger it
-						const boost::optional< std::vector<RedisMessage> > sr = sleep_getter.wait_for_response();
+						const std::optional< std::vector<RedisMessage> > sr = sleep_getter.wait_for_response();
 
 						// Now expect the client to have caused the error after approximately 5 seconds
 						// because this is when the timeout hits
@@ -838,7 +838,7 @@ bool test_mt_read_timeout() {
 					try {				
 						BlockingRetriever< boost::int64_t > incr_getter{ 6 };
 						client.incr("redistest:mt:testval", incr_getter.responder());
-						const boost::optional<  boost::int64_t > incr_result = incr_getter.wait_for_response();
+						const std::optional<  boost::int64_t > incr_result = incr_getter.wait_for_response();
 						const fsec dur = (boost::chrono::steady_clock::now() - get_start);
 
 						// Whatever that is, the retriever should have bailed with an exception after 10 seconds
@@ -934,7 +934,7 @@ void test_long_runs() {
 
 	try {
 		client.eval(time_wasting_script, keys, args, rtr.responder());
-		const boost::optional<boost::int64_t> result = rtr.wait_for_response();
+		const std::optional<boost::int64_t> result = rtr.wait_for_response();
 
 		// I don't want to see either message but the timeout to cause an exception
 		if (!result) {
@@ -954,7 +954,7 @@ void test_long_runs() {
 
 	BlockingRetriever<boost::int64_t> dummy_getter(1);   // timeout of one second should be enough
 	client.get("answer", dummy_getter.responder());
-	const boost::optional<boost::int64_t> result = dummy_getter.wait_for_response();
+	const std::optional<boost::int64_t> result = dummy_getter.wait_for_response();
 	boost::ignore_unused(result);
 
 	client.del("answer");
